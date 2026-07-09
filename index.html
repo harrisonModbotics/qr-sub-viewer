@@ -120,92 +120,123 @@
 </style>
 <script src="qr-codec.js"></script>
 <script src="vendor/jsQR.min.js"></script>
+<style>
+  :root{--bg:#f4f6f8;--panel:#fff;--ink:#1c2733;--muted:#6b7885;--line:#e2e8ee;--accent:#2f6feb;--accent-d:#255bd0;}
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;display:flex;flex-direction:column;overflow:hidden;}
+  .sidebar,.sidebar-toggle,.production-board,.tabs,.current-build,#v1bar,.toolbar{display:none!important;}
+  #appbar{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--panel);border-bottom:1px solid var(--line);box-shadow:0 1px 3px rgba(0,0,0,.05);z-index:20;flex:0 0 auto;}
+  #appbar .brand{display:flex;align-items:center;gap:9px;min-width:0;}
+  #appbar .logo{width:28px;height:28px;border-radius:7px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 auto;}
+  #appbar .ttl{display:flex;flex-direction:column;min-width:0;}
+  #appbar .ttl strong{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  #appbar .tools{margin-left:auto;display:flex;align-items:center;gap:6px;}
+  #appbar .mstat{font-size:11px;color:var(--muted);font-family:ui-monospace,monospace;margin-right:4px;max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tbtn{height:34px;min-width:34px;padding:0 10px;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:8px;font-size:15px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:4px;}
+  .tbtn:hover{background:#eef2f7;}
+  .tbtn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .tbtn.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-size:14px;font-weight:600;padding:0 14px;}
+  .tbtn.primary:hover{background:var(--accent-d);}
+  #stage{position:relative;flex:1 1 auto;overflow:hidden;background:radial-gradient(circle at 1px 1px,#dbe2ea 1px,transparent 0) 0 0/22px 22px,var(--bg);}
+  svg#svg{position:absolute;inset:0;width:100%;height:100%;background:transparent;border:none;touch-action:none;display:block;cursor:grab;}
+  svg#svg.measuring{cursor:crosshair;}
+  svg#svg.panning{cursor:grabbing;}
+  .cutlist{position:absolute;right:12px;bottom:12px;z-index:5;width:250px;max-height:46vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:10px;box-shadow:0 6px 20px rgba(0,0,0,.12);font-size:12px;resize:both;}
+  .cutlist.hidden{display:none;}
+  .cutlist.collapsed{max-height:none;overflow:hidden;resize:none;width:auto;}
+  .cutlist.collapsed table{display:none;}
+  .cutlist h4{margin:0;padding:8px 11px;background:#f7f9fb;border-bottom:1px solid var(--line);border-radius:10px 10px 0 0;font-size:12px;font-weight:600;cursor:grab;user-select:none;position:sticky;top:0;}
+  .cutlist table{width:100%;border-collapse:collapse;}
+  .cutlist th{position:sticky;top:33px;text-align:left;padding:4px 9px;background:#fbfcfd;border-bottom:1px solid var(--line);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
+  .cutlist td{padding:4px 9px;border-bottom:1px solid #f0f3f6;font-family:ui-monospace,monospace;font-size:11px;}
+  .cutlist tr:hover{background:#f2f7ff;}
+  .settings-overlay{display:none;position:fixed;inset:0;background:rgba(15,25,35,.35);z-index:100;}
+  .settings-overlay.open{display:block;}
+  .settings-panel{position:absolute;top:0;right:0;bottom:0;width:min(92vw,380px);background:var(--panel);box-shadow:-8px 0 30px rgba(0,0,0,.18);padding:16px 18px 48px;overflow-y:auto;border:none;border-radius:0;max-height:none;animation:qslide .18s ease;}
+  @keyframes qslide{from{transform:translateX(24px);opacity:.5;}to{transform:none;opacity:1;}}
+  .settings-panel h3{margin:0 0 12px;font-size:16px;font-weight:600;color:var(--ink);}
+  .settings-panel .section{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px;border-top:1px solid var(--line);padding-top:10px;font-weight:600;}
+  .settings-panel .sub-section{font-size:11px;color:#9aa7b3;margin:8px 0 4px;font-style:normal;font-weight:600;}
+  .settings-panel .toggles{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;}
+  .settings-panel .toggles label{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink);padding:4px 0;cursor:pointer;width:auto;}
+  .settings-panel .toggles input{width:16px;height:16px;flex:0 0 auto;}
+  .settings-panel .row{display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .settings-panel .row label{font-size:12px;color:var(--muted);width:118px;flex:0 0 auto;}
+  .settings-panel .row input[type=color]{width:30px;height:22px;border:1px solid var(--line);padding:0;border-radius:4px;cursor:pointer;}
+  .settings-panel .row input[type=range]{flex:1;}
+  .settings-panel .row input[type=number]{width:56px;font-size:12px;padding:2px 4px;border:1px solid var(--line);border-radius:5px;}
+  .settings-panel .row select{font-size:12px;padding:2px 4px;border:1px solid var(--line);border-radius:5px;flex:1;}
+  .settings-panel .row .val{font-size:10px;color:var(--muted);font-family:ui-monospace,monospace;width:40px;text-align:right;}
+  .settings-panel button{margin-top:10px;padding:8px 14px;font-size:13px;border:1px solid var(--line);border-radius:8px;background:#f7f9fb;cursor:pointer;}
+  .settings-panel button:hover{background:#eef2f7;}
+  #btnSettingsClose{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important;}
+  #scanOverlay{display:none;position:fixed;inset:0;background:rgba(10,16,22,.9);z-index:200;justify-content:center;align-items:center;}
+  #scanOverlay.open{display:flex;}
+  .scan-box{background:#141a20;color:#fff;border-radius:14px;padding:16px;width:min(94vw,440px);display:flex;flex-direction:column;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .scan-head{display:flex;justify-content:space-between;align-items:center;font-size:16px;font-weight:600;}
+  .scan-head button{background:#2a333c;color:#fff;border:none;border-radius:8px;width:32px;height:32px;font-size:16px;cursor:pointer;}
+  #scanVideo{width:100%;border-radius:10px;background:#000;aspect-ratio:1/1;object-fit:cover;}
+  .scan-status{font-size:12px;color:#8fb6e6;font-family:ui-monospace,monospace;min-height:16px;text-align:center;}
+  .scan-manual{display:flex;gap:8px;}
+  .scan-manual input{flex:1;font-family:ui-monospace,monospace;font-size:12px;padding:9px;border-radius:8px;border:1px solid #333;background:#0e1318;color:#fff;}
+  .scan-manual button{padding:9px 14px;border-radius:8px;border:none;background:var(--accent);color:#fff;cursor:pointer;font-weight:600;}
+  @media (max-width:640px){ .cutlist{width:188px;right:8px;bottom:8px;max-height:42vh;} #appbar .mstat{display:none;} #appbar .ttl strong{max-width:34vw;} .tbtn{padding:0 8px;} }
+</style>
 </head>
 <body>
 
-<div class="sidebar-toggle" id="sidebarToggle">📁 Files</div>
-<div class="sidebar" id="sidebar">
-  <span class="close-btn" id="sidebarClose">✕</span>
-  <h4>CDT Files</h4>
-  <div class="upload-area" id="uploadArea">
-    <div>Drop .cdt files or click to upload</div>
-    <input type="file" id="fileInput" multiple accept=".cdt" webkitdirectory>
+<header id="appbar">
+  <div class="brand">
+    <span class="logo">▤</span>
+    <div class="ttl"><strong id="v1sub">Demo</strong></div>
   </div>
-  <ul class="file-list" id="fileList"></ul>
-</div>
-
-<div class="toolbar">
-  <label><input type="checkbox" id="chkFront" checked> Front</label>
-  <label><input type="checkbox" id="chkBackView"> Back view</label>
-  <label><input type="checkbox" id="chkTop" checked> Top</label>
-  <label><input type="checkbox" id="chkSide" checked> Side</label>
-  <label><input type="checkbox" id="chkBottom" checked> Bottom</label>
-  <label><input type="checkbox" id="chkHideKing" checked> Hide king</label>
-  <div class="sep"></div>
-  <label><input type="checkbox" id="chkDims" checked> Dims</label>
-  <label><input type="checkbox" id="chkStudDims" checked> Stud chain</label>
-  <label><input type="checkbox" id="chkOpenDims" checked> Opening dims</label>
-  <label><input type="checkbox" id="chkSpecs" checked> Specs</label>
-  <label><input type="checkbox" id="chkRouting" checked> Routing</label>
-  <label><input type="checkbox" id="chkNails"> Nails</label>
-  <label><input type="checkbox" id="chkSheets"> Sheets</label>
-  <label><input type="checkbox" id="chkOriginDims" checked> Origin dims</label>
-  <label><input type="checkbox" id="chkOriginR"> Origin R</label>
-  <label><input type="checkbox" id="chkCutEnds" checked> Cut ends</label>
-  <label><input type="checkbox" id="chkSheetSide" checked> Sheet side</label>
-  <label><input type="checkbox" id="chkCutList" checked> Cut list</label>
-  <div class="sep"></div>
-  <button id="btnMeasure">Measure</button>
-  <button id="btnClear">Clear</button>
-  <button id="btnZoomReset">Reset zoom</button>
-  <span class="mstat" id="mStatus"></span>
-  <div class="sep"></div>
-  <button id="btnProduction">Production Board</button>
-  <button id="btnImportList">Import List CSV</button>
-  <input type="file" id="productionInput" accept=".csv,.txt" style="display:none">
-  <span class="production-hint" id="productionHint">No production list loaded</span>
-  <div class="sep"></div>
-  <button id="btnSettings">⚙ Settings</button>
-</div>
-<div id="v1bar">
-  <button id="scanBtn">📷 Scan</button>
-  <strong id="v1sub">—</strong>
-  <span style="flex:1"></span>
-  <input id="v1input" placeholder="Paste V1 code (V1*S:...)" style="flex:2;min-width:180px;">
-  <button id="v1load">Render code</button>
-</div>
-<div class="tabs" id="tabs"></div>
-<div class="current-build" id="currentBuild"><input type="checkbox" id="currentBuildCheck"><div><strong id="currentBuildTitle"></strong><span id="currentBuildMeta"></span></div></div>
-<div class="main-area"><svg id="svg"></svg><div class="cutlist" id="cutlist"></div></div>
-<div class="production-board" id="productionBoard">
-  <div class="production-head">
-    <div>
-      <h3>Production Sub Board</h3>
-      <div class="production-summary" id="productionSummary"></div>
-    </div>
-    <div class="production-actions">
-      <button id="btnExportRemaining">Export Remaining CSV</button>
-      <button id="btnExportLog">Export Built Log CSV</button>
-      <button id="btnHideBuilt">Hide Built</button>
-      <button id="btnClearBuilt">Clear Ticks</button>
-    </div>
+  <div class="tools">
+    <span id="mStatus" class="mstat"></span>
+    <button id="btnMeasure" class="tbtn" title="Measure tool">📏</button>
+    <button id="btnClear" class="tbtn" title="Clear measurements">✕</button>
+    <button id="btnZoomReset" class="tbtn" title="Fit / reset zoom">⤢</button>
+    <button id="btnSettings" class="tbtn" title="Settings">⚙</button>
+    <button id="scanBtn" class="tbtn primary" title="Scan a sub QR">📷 Scan</button>
   </div>
-  <div class="sub-grid" id="subGrid"></div>
-  <aside class="production-side">
-    <h4>Production List Format</h4>
-    <textarea readonly>order,panel,sub,qty,station,notes
-1,S-1-B-W05.cdt,1,1,Sub bench,Window sub first
-2,S-1-B-W05.cdt,2,1,Sub bench,
-3,S-1-B-W06.cdt,all,1,Sub bench,</textarea>
-    <h4 style="margin-top:12px;">Built Log</h4>
-    <ul class="build-log" id="buildLog"></ul>
-  </aside>
-</div>
+</header>
+<main id="stage">
+  <svg id="svg"></svg>
+  <div class="cutlist" id="cutlist"></div>
+</main>
 
 <!-- Settings -->
 <div class="settings-overlay" id="settingsOverlay">
 <div class="settings-panel">
   <h3>⚙ Display Settings</h3>
+
+  <div class="section">Views</div>
+  <div class="toggles">
+    <label><input type="checkbox" id="chkFront" checked> Front</label>
+    <label><input type="checkbox" id="chkBackView"> Back view</label>
+    <label><input type="checkbox" id="chkTop" checked> Top</label>
+    <label><input type="checkbox" id="chkBottom" checked> Bottom</label>
+    <label><input type="checkbox" id="chkSide" checked> Side</label>
+    <label><input type="checkbox" id="chkHideKing" checked> Hide king (side)</label>
+  </div>
+  <div class="section">Dimensions &amp; labels</div>
+  <div class="toggles">
+    <label><input type="checkbox" id="chkDims" checked> Overall dims</label>
+    <label><input type="checkbox" id="chkStudDims"> Stud chain</label>
+    <label><input type="checkbox" id="chkOpenDims" checked> Opening dims</label>
+    <label><input type="checkbox" id="chkOriginDims" checked> Origin dims</label>
+    <label><input type="checkbox" id="chkOriginR"> Origin from right</label>
+    <label><input type="checkbox" id="chkSpecs" checked> Header/sill specs</label>
+    <label><input type="checkbox" id="chkCutEnds" checked> Cut-end marks</label>
+    <label><input type="checkbox" id="chkSheetSide" checked> Sheet-side mark</label>
+  </div>
+  <div class="section">Other</div>
+  <div class="toggles">
+    <label><input type="checkbox" id="chkRouting" checked> Routing outline</label>
+    <label><input type="checkbox" id="chkNails"> Nails</label>
+    <label><input type="checkbox" id="chkSheets"> Sheets</label>
+    <label><input type="checkbox" id="chkCutList" checked> Cut list</label>
+  </div>
 
   <div class="section">Element Colours</div>
   <div class="row"><label>Stud</label><input type="color" id="cStud" value="#c8a26e"><span class="val"></span></div>
@@ -350,7 +381,6 @@ FST:2806:2753:25:2806:2683:25:0:Standard Nail
 FST:3134:0:55:3134:70:55:0:Standard Nail
 INK:1578.5:2753:0:S-1-B-W05
 INK:1578.5:0:0:S-1-B-W05`;
-const SAMPLE_CDTS=[{"name":"A2-B_1_ST_MB-W-01.cdt","raw":"COPYRIGHT: Randek AB. This document/file is protected by copyright proprietary to Randek AB and may only be used for the intended purpose. This document/file may not be copied, used, distributed or similar, without the prior written approval of Randek AB.;\r\n\r\nVERSION:5.0.15;\r\nTXT:====================================================;\r\nTXT:Executable;\r\nTXT:Hsb-Version;\r\nTXT:Randek-Version;\r\nTXT:Zones;\r\nTXT:FrameNailing;\r\nTXT:Rotation;\r\nTXT:Flip;\r\nTXT:Breather Paper;\r\nTXT:Branders;\r\nTXT:Insulation;\r\nTXT:Tape Nailing;\r\nTXT:Glue lines;\r\nTXT:Ink lines;\r\nTXT:Internal Wall Types;\r\nTXT:External Wall Types;\r\nTXT:Modular Wall Types;\r\nTXT:Nail Specifications;\r\nTXT:Sheet Indexes;\r\nTXT:Exclude Datum X Tags;\r\nTXT:Exclude Datum Y Tags;\r\nTXT:Exclude Datum Z Tags;\r\nTXT:Resequence sheets;\r\nTXT:====================================================;\r\nTXT:FRAMING_STATION;\r\nTXT:PANEL_IDENTIFICATION_TOPRAIL;\r\nTXT:PANEL_IDENTIFICATION_BOTTOMRAIL;\r\nTXT:NAILING_BOARD_OUTSIDE;\r\nPNO:pno;\r\nFL:0;\r\nSEQUENCENUMBER:0;\r\nMASS:0;\r\nELD:EXTERIOR;\r\nDNO:A2-B.1.ST_MB-W-01;\r\nELF:INSIDE;\r\nELM:3369.5:2802:140:1:3369:2802:140;\r\n\r\n\r\nTS:3369.5:45:140:0:2757:0:SFTopPlate:L=3369:WxH=45x140:q;\r\nBS:3369.5:45:140:0:0:0:SFBottomPlate:L=3369:WxH=45x140:q;\r\n\r\nST:45:2712:90:280:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:580.5:45:50:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:880:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:1180.5:45:50:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:1481:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:1781.5:45:50:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:2082:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:2382.5:45:50:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:2784.5:45:50:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:140:2829.5:45:0:Stud:L=2712:WxH=45x140:q;\r\nST:45:2712:90:2982.5:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:140:3189.5:45:0:Stud:L=2712:WxH=45x140:q;\r\n\r\nSUB:135:2712:140:0:45:0:81f84f48-a608-4b7d-b5d9-bb9122eebe50;\r\nST:45:2712:140:0:45:0:SFStudLeft:L=2712:WxH=45x140:q;\r\nST:45:155:140:45:2602:0:SFStudLeft:L=155:WxH=45x140:q;\r\nST:45:2307:140:45:45:0:SFStudLeft:L=2307:WxH=45x140:q;\r\nST:45:2712:140:90:45:0:SFStudLeft:L=2712:WxH=45x140:q;\r\nSUE;\r\nSUB:135:2712:140:3234.5:45:0:876593d7-c03a-46ac-9af4-2ca50967ae92;\r\nST:45:2712:140:3234.5:45:0:SFStudLeft:L=2712:WxH=45x140:q;\r\nST:45:155:140:3279.5:2602:0:SFStudLeft:L=155:WxH=45x140:q;\r\nST:45:2307:140:3279.5:45:0:SFStudLeft:L=2307:WxH=45x140:q;\r\nST:45:2712:140:3324.5:45:0:SFStudLeft:L=2712:WxH=45x140:q;\r\nSUE;\r\n\r\nBOI1:1200:3050:9:1204:9:140:11:M.B - STRUCTApanel;\r\nBOI1:1200:3050:9:2406:9:140:11:M.B - STRUCTApanel;\r\n\r\nBOI2:599:2784:13:1204:9:149:32:M.B - Fyrchek Plaste;\r\nBOI2:1200:2784:13:1805:9:149:32:M.B - Fyrchek Plaste;\r\n\r\nBOI3:1200:2784:13:1204:9:162:32:M.B - Fyrchek Plaste;\r\nBOI3:1200:2784:13:2406:9:162:32:M.B - Fyrchek Plaste;\r\n\r\n\r\n\r\nNL:1214.7:123:149:1214.7:2723:149:100:12;\r\nNL:1254:27:149:2354:27:149:100:12;\r\nNL:1254:2775:149:2354:2775:149:100:12;\r\nNL:1804:123:149:1804:2723:149:200:12;\r\nNL:2393.3:123:149:2393.3:2723:149:100:12;\r\nNL:2416.7:123:149:2416.7:2723:149:100:12;\r\nNL:2430.2:27:149:2830.2:27:149:100:12;\r\nNL:2436.8:2775:149:3336.8:2775:149:100:12;\r\nNL:2705.5:123:149:2705.5:2723:149:100:12;\r\nNL:2842:123:149:2842:2723:149:100:12;\r\nNL:3257:123:149:3257:2723:149:100:12;\r\nNL:3346:123:149:3346:2723:149:100:12;\r\n\r\nNL:23.5:99:162:23.5:2703:162:2604:15;\r\nNL:590.8:99:162:590.8:2703:162:2604:15;\r\nNL:614.2:99:162:614.2:2703:162:2604:15;\r\nNL:1214.3:99:162:1214.3:2703:162:2604:15;\r\nNL:1214.3:303:162:1214.3:2103:162:600:15;\r\nNL:1792.2:99:162:1792.2:2703:162:2604:15;\r\nNL:1792.2:303:162:1792.2:2103:162:600:15;\r\nNL:1815.8:99:162:1815.8:2703:162:2604:15;\r\nNL:1815.8:303:162:1815.8:2103:162:600:15;\r\nNL:2405:99:162:2405:2703:162:2604:15;\r\nNL:2405:303:162:2405:2103:162:600:15;\r\nNL:2842:99:162:2842:2703:162:2604:15;\r\nNL:2842:303:162:2842:2103:162:600:15;\r\nNL:2994.2:99:162:2994.2:2703:162:2604:15;\r\nNL:2994.2:303:162:2994.2:2103:162:600:15;\r\nNL:3017.8:99:162:3017.8:2703:162:2604:15;\r\nNL:3017.8:303:162:3017.8:2103:162:600:15;\r\nNL:3212:99:162:3212:2703:162:2604:15;\r\nNL:3212:303:162:3212:2103:162:600:15;\r\n\r\nNL:1214.7:59:175:1214.7:2743:175:2684:15;\r\nNL:1214.7:193:175:1214.7:2593:175:150:15;\r\nNL:1804:59:175:1804:2743:175:2684:15;\r\nNL:1804:193:175:1804:2593:175:150:15;\r\nNL:2393.3:59:175:2393.3:2743:175:2684:15;\r\nNL:2393.3:193:175:2393.3:2593:175:150:15;\r\nNL:2416.7:59:175:2416.7:2743:175:2684:15;\r\nNL:2416.7:193:175:2416.7:2593:175:150:15;\r\nNL:2842:59:175:2842:2743:175:2684:15;\r\nNL:2842:193:175:2842:2593:175:150:15;\r\nNL:3212:59:175:3212:2743:175:2684:15;\r\nNL:3212:193:175:3212:2593:175:150:15;\r\n\r\n\r\nROB:3367.5:9:149:1;\r\nRL:3367.5:3059:140:0;\r\nRL:3606:3059:140:0;\r\nRL:3606:9:140:0;\r\nRL:3367.5:9:140:0;\r\nROE;\r\nROB:3242:9:175:1;\r\nRL:3242:2793:162:0;\r\nRL:3606:2793:162:0;\r\nRL:3606:9:162:0;\r\nRL:3242:9:162:0;\r\nROE;\r\nROB:3367.5:2793:149:2;\r\nRL:1204:2793:140:0;\r\nROE;\r\n\r\nINK:1684.7:2802:0:MB-W-01;\r\n\r\nINK:1684.7:0:0:MB-W-01;\r\n\r\nFST:22:0:25:22:70:25:0:Standard Nail;\r\nFST:22:0:55:22:70:55:0:Standard Nail;\r\nFST:22:0:85:22:70:85:0:Standard Nail;\r\nFST:22:0:115:22:70:115:0:Standard Nail;\r\nFST:22:2802:25:22:2732:25:0:Standard Nail;\r\nFST:22:2802:55:22:2732:55:0:Standard Nail;\r\nFST:22:2802:85:22:2732:85:0:Standard Nail;\r\nFST:22:2802:115:22:2732:115:0:Standard Nail;\r\nFST:67:0:25:67:70:25:0:Standard Nail;\r\nFST:67:0:55:67:70:55:0:Standard Nail;\r\nFST:67:0:85:67:70:85:0:Standard Nail;\r\nFST:67:0:115:67:70:115:0:Standard Nail;\r\nFST:67:2802:25:67:2732:25:0:Standard Nail;\r\nFST:67:2802:55:67:2732:55:0:Standard Nail;\r\nFST:67:2802:85:67:2732:85:0:Standard Nail;\r\nFST:67:2802:115:67:2732:115:0:Standard Nail;\r\nFST:112:0:25:112:70:25:0:Standard Nail;\r\nFST:112:0:55:112:70:55:0:Standard Nail;\r\nFST:112:0:85:112:70:85:0:Standard Nail;\r\nFST:112:0:115:112:70:115:0:Standard Nail;\r\nFST:112:2802:25:112:2732:25:0:Standard Nail;\r\nFST:112:2802:55:112:2732:55:0:Standard Nail;\r\nFST:112:2802:85:112:2732:85:0:Standard Nail;\r\nFST:112:2802:115:112:2732:115:0:Standard Nail;\r\nFST:302:0:20:302:70:20:0:Standard Nail;\r\nFST:302:0:45:302:70:45:0:Standard Nail;\r\nFST:302:0:70:302:70:70:0:Standard Nail;\r\nFST:302:2802:20:302:2732:20:0:Standard Nail;\r\nFST:302:2802:45:302:2732:45:0:Standard Nail;\r\nFST:302:2802:70:302:2732:70:0:Standard Nail;\r\nFST:602.5:0:70:602.5:70:70:0:Standard Nail;\r\nFST:602.5:0:95:602.5:70:95:0:Standard Nail;\r\nFST:602.5:0:120:602.5:70:120:0:Standard Nail;\r\nFST:602.5:2802:70:602.5:2732:70:0:Standard Nail;\r\nFST:602.5:2802:95:602.5:2732:95:0:Standard Nail;\r\nFST:602.5:2802:120:602.5:2732:120:0:Standard Nail;\r\nFST:902:0:20:902:70:20:0:Standard Nail;\r\nFST:902:0:45:902:70:45:0:Standard Nail;\r\nFST:902:0:70:902:70:70:0:Standard Nail;\r\nFST:902:2802:20:902:2732:20:0:Standard Nail;\r\nFST:902:2802:45:902:2732:45:0:Standard Nail;\r\nFST:902:2802:70:902:2732:70:0:Standard Nail;\r\nFST:1202.5:0:70:1202.5:70:70:0:Standard Nail;\r\nFST:1202.5:0:95:1202.5:70:95:0:Standard Nail;\r\nFST:1202.5:0:120:1202.5:70:120:0:Standard Nail;\r\nFST:1202.5:2802:70:1202.5:2732:70:0:Standard Nail;\r\nFST:1202.5:2802:95:1202.5:2732:95:0:Standard Nail;\r\nFST:1202.5:2802:120:1202.5:2732:120:0:Standard Nail;\r\nFST:1503:0:20:1503:70:20:0:Standard Nail;\r\nFST:1503:0:45:1503:70:45:0:Standard Nail;\r\nFST:1503:0:70:1503:70:70:0:Standard Nail;\r\nFST:1503:2802:20:1503:2732:20:0:Standard Nail;\r\nFST:1503:2802:45:1503:2732:45:0:Standard Nail;\r\nFST:1503:2802:70:1503:2732:70:0:Standard Nail;\r\nFST:1803.5:0:70:1803.5:70:70:0:Standard Nail;\r\nFST:1803.5:0:95:1803.5:70:95:0:Standard Nail;\r\nFST:1803.5:0:120:1803.5:70:120:0:Standard Nail;\r\nFST:1803.5:2802:70:1803.5:2732:70:0:Standard Nail;\r\nFST:1803.5:2802:95:1803.5:2732:95:0:Standard Nail;\r\nFST:1803.5:2802:120:1803.5:2732:120:0:Standard Nail;\r\nFST:2104:0:20:2104:70:20:0:Standard Nail;\r\nFST:2104:0:45:2104:70:45:0:Standard Nail;\r\nFST:2104:0:70:2104:70:70:0:Standard Nail;\r\nFST:2104:2802:20:2104:2732:20:0:Standard Nail;\r\nFST:2104:2802:45:2104:2732:45:0:Standard Nail;\r\nFST:2104:2802:70:2104:2732:70:0:Standard Nail;\r\nFST:2404.5:0:70:2404.5:70:70:0:Standard Nail;\r\nFST:2404.5:0:95:2404.5:70:95:0:Standard Nail;\r\nFST:2404.5:0:120:2404.5:70:120:0:Standard Nail;\r\nFST:2404.5:2802:70:2404.5:2732:70:0:Standard Nail;\r\nFST:2404.5:2802:95:2404.5:2732:95:0:Standard Nail;\r\nFST:2404.5:2802:120:2404.5:2732:120:0:Standard Nail;\r\nFST:2806.5:0:70:2806.5:70:70:0:Standard Nail;\r\nFST:2806.5:0:95:2806.5:70:95:0:Standard Nail;\r\nFST:2806.5:0:120:2806.5:70:120:0:Standard Nail;\r\nFST:2806.5:2802:70:2806.5:2732:70:0:Standard Nail;\r\nFST:2806.5:2802:95:2806.5:2732:95:0:Standard Nail;\r\nFST:2806.5:2802:120:2806.5:2732:120:0:Standard Nail;\r\nFST:2851.5:0:25:2851.5:70:25:0:Standard Nail;\r\nFST:2851.5:0:55:2851.5:70:55:0:Standard Nail;\r\nFST:2851.5:0:85:2851.5:70:85:0:Standard Nail;\r\nFST:2851.5:0:115:2851.5:70:115:0:Standard Nail;\r\nFST:2851.5:2802:25:2851.5:2732:25:0:Standard Nail;\r\nFST:2851.5:2802:55:2851.5:2732:55:0:Standard Nail;\r\nFST:2851.5:2802:85:2851.5:2732:85:0:Standard Nail;\r\nFST:2851.5:2802:115:2851.5:2732:115:0:Standard Nail;\r\nFST:3004.5:0:20:3004.5:70:20:0:Standard Nail;\r\nFST:3004.5:0:45:3004.5:70:45:0:Standard Nail;\r\nFST:3004.5:0:70:3004.5:70:70:0:Standard Nail;\r\nFST:3004.5:2802:20:3004.5:2732:20:0:Standard Nail;\r\nFST:3004.5:2802:45:3004.5:2732:45:0:Standard Nail;\r\nFST:3004.5:2802:70:3004.5:2732:70:0:Standard Nail;\r\nFST:3211.5:0:25:3211.5:70:25:0:Standard Nail;\r\nFST:3211.5:0:55:3211.5:70:55:0:Standard Nail;\r\nFST:3211.5:0:85:3211.5:70:85:0:Standard Nail;\r\nFST:3211.5:0:115:3211.5:70:115:0:Standard Nail;\r\nFST:3211.5:2802:25:3211.5:2732:25:0:Standard Nail;\r\nFST:3211.5:2802:55:3211.5:2732:55:0:Standard Nail;\r\nFST:3211.5:2802:85:3211.5:2732:85:0:Standard Nail;\r\nFST:3211.5:2802:115:3211.5:2732:115:0:Standard Nail;\r\nFST:3256.5:0:25:3256.5:70:25:0:Standard Nail;\r\nFST:3256.5:0:55:3256.5:70:55:0:Standard Nail;\r\nFST:3256.5:0:85:3256.5:70:85:0:Standard Nail;\r\nFST:3256.5:0:115:3256.5:70:115:0:Standard Nail;\r\nFST:3256.5:2802:25:3256.5:2732:25:0:Standard Nail;\r\nFST:3256.5:2802:55:3256.5:2732:55:0:Standard Nail;\r\nFST:3256.5:2802:85:3256.5:2732:85:0:Standard Nail;\r\nFST:3256.5:2802:115:3256.5:2732:115:0:Standard Nail;\r\nFST:3301.5:0:25:3301.5:70:25:0:Standard Nail;\r\nFST:3301.5:0:55:3301.5:70:55:0:Standard Nail;\r\nFST:3301.5:0:85:3301.5:70:85:0:Standard Nail;\r\nFST:3301.5:0:115:3301.5:70:115:0:Standard Nail;\r\nFST:3301.5:2802:25:3301.5:2732:25:0:Standard Nail;\r\nFST:3301.5:2802:55:3301.5:2732:55:0:Standard Nail;\r\nFST:3301.5:2802:85:3301.5:2732:85:0:Standard Nail;\r\nFST:3301.5:2802:115:3301.5:2732:115:0:Standard Nail;\r\nFST:3346.5:0:25:3346.5:70:25:0:Standard Nail;\r\nFST:3346.5:0:55:3346.5:70:55:0:Standard Nail;\r\nFST:3346.5:0:85:3346.5:70:85:0:Standard Nail;\r\nFST:3346.5:0:115:3346.5:70:115:0:Standard Nail;\r\nFST:3346.5:2802:25:3346.5:2732:25:0:Standard Nail;\r\nFST:3346.5:2802:55:3346.5:2732:55:0:Standard Nail;\r\nFST:3346.5:2802:85:3346.5:2732:85:0:Standard Nail;\r\nFST:3346.5:2802:115:3346.5:2732:115:0:Standard Nail;\r\n\r\n\r\nEOF;\r\n"},{"name":"A2-B_1_ST_MB-W-02.cdt","raw":"COPYRIGHT: Randek AB. This document/file is protected by copyright proprietary to Randek AB and may only be used for the intended purpose. This document/file may not be copied, used, distributed or similar, without the prior written approval of Randek AB.;\r\n\r\nVERSION:5.0.15;\r\nTXT:====================================================;\r\nTXT:Executable;\r\nTXT:Hsb-Version;\r\nTXT:Randek-Version;\r\nTXT:Zones;\r\nTXT:FrameNailing;\r\nTXT:Rotation;\r\nTXT:Flip;\r\nTXT:Breather Paper;\r\nTXT:Branders;\r\nTXT:Insulation;\r\nTXT:Tape Nailing;\r\nTXT:Glue lines;\r\nTXT:Ink lines;\r\nTXT:Internal Wall Types;\r\nTXT:External Wall Types;\r\nTXT:Modular Wall Types;\r\nTXT:Nail Specifications;\r\nTXT:Sheet Indexes;\r\nTXT:Exclude Datum X Tags;\r\nTXT:Exclude Datum Y Tags;\r\nTXT:Exclude Datum Z Tags;\r\nTXT:Resequence sheets;\r\nTXT:====================================================;\r\nTXT:FRAMING_STATION;\r\nTXT:PANEL_IDENTIFICATION_TOPRAIL;\r\nTXT:PANEL_IDENTIFICATION_BOTTOMRAIL;\r\nTXT:NAILING_BOARD_OUTSIDE;\r\nPNO:pno;\r\nFL:0;\r\nSEQUENCENUMBER:0;\r\nMASS:0;\r\nELD:EXTERIOR;\r\nDNO:A2-B.1.ST_MB-W-02;\r\nELF:INSIDE;\r\nELM:4737:2802:90:1:4737:2802:90;\r\n\r\n\r\nTS:4737:45:90:0:2757:0:SFTopPlate:L=4737:WxH=45x90:q;\r\nBS:4737:45:90:0:0:0:SFBottomPlate:L=4737:WxH=45x90:q;\r\n\r\nST:45:2712:90:0:45:0:SFStudLeft:L=2712:WxH=45x90:q;\r\nST:45:2712:90:579.5:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:1179.5:45:0:Stud:L=2712:WxH=45x90:q;\r\n\r\nSUB:180:2712:90:1523:45:0:4140c3c9-c380-4a30-95e4-ee85b9b7ec6e;\r\nST:45:2712:90:1523:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:90:2712:45:1568:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:1658:45:0:Stud:L=2712:WxH=45x90:q;\r\nSUE;\r\nSUB:90:2712:90:1735.5:45:0:734e3eef-157e-4301-96de-bb9ebd125f14;\r\nST:45:2712:90:1735.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nST:45:2712:90:1780.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nSUE;\r\nSUB:90:2712:90:4139.5:45:0:7bae08b0-e412-442b-b593-f30e90ea581f;\r\nST:45:2712:90:4139.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nST:45:2712:90:4184.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nSUE;\r\nSUB:90:2712:90:4647:45:0:94d63605-b69c-4247-ae2a-cd6d4b993d57;\r\nST:45:2712:90:4647:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nST:45:2712:90:4692:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nSUE;\r\nSUB:90:2712:90:2937.5:45:0:d5317c75-9036-46f2-b601-fab0f65ca838;\r\nST:45:2712:90:2937.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nST:45:2712:90:2982.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nSUE;\r\nSUB:90:2712:90:3538.5:45:0:ef81754d-15ca-4404-818b-2eb94c706f9f;\r\nST:45:2712:90:3538.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nST:45:2712:90:3583.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nSUE;\r\nSUB:90:2712:90:2336.5:45:0:f4c5fdf4-6eb9-4b3d-a1e6-725549c82fae;\r\nST:45:2712:90:2336.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nST:45:2712:90:2381.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nSUE;\r\n\r\nBOI1:1200:3050:9:1:9:90:11:M.B - STRUCTApanel;\r\nBOI1:1200:3050:9:1203:9:90:11:M.B - STRUCTApanel;\r\nBOI1:1200:3050:9:2405:9:90:11:M.B - STRUCTApanel;\r\nBOI1:1200:3050:9:3607:9:90:11:M.B - STRUCTApanel;\r\n\r\nBOI2:1200:2784:13:1:9:99:32:M.B - Fyrchek Plaste;\r\nBOI2:1200:2784:13:1203:9:99:32:M.B - Fyrchek Plaste;\r\nBOI2:1200:2784:13:2405:9:99:32:M.B - Fyrchek Plaste;\r\nBOI2:1200:2784:13:3607:9:99:32:M.B - Fyrchek Plaste;\r\n\r\nBOI3:1200:2784:13:602:9:112:32:M.B - Fyrchek Plaste;\r\nBOI3:1200:2784:13:1804:9:112:32:M.B - Fyrchek Plaste;\r\nBOI3:1200:2784:13:3006:9:112:32:M.B - Fyrchek Plaste;\r\nBOI3:599:2784:13:4208:9:112:32:M.B - Fyrchek Plaste;\r\n\r\n\r\n\r\nNL:23:123:99:23:2723:99:100:12;\r\nNL:51:27:99:1151:27:99:100:12;\r\nNL:51:2775:99:1151:2775:99:100:12;\r\nNL:602:123:99:602:2723:99:200:12;\r\nNL:1190.3:123:99:1190.3:2723:99:100:12;\r\nNL:1213.8:123:99:1213.8:2723:99:100:12;\r\nNL:1253:27:99:2353:27:99:100:12;\r\nNL:1253:2775:99:2353:2775:99:100:12;\r\nNL:1545.5:123:99:1545.5:2723:99:200:12;\r\nNL:1803:123:99:1803:2723:99:200:12;\r\nNL:2392.3:123:99:2392.3:2723:99:100:12;\r\nNL:2415.8:123:99:2415.8:2723:99:100:12;\r\nNL:2455:27:99:3555:27:99:100:12;\r\nNL:2455:2775:99:3555:2775:99:100:12;\r\nNL:3005:123:99:3005:2723:99:200:12;\r\nNL:3594.3:123:99:3594.3:2723:99:100:12;\r\nNL:3617.8:123:99:3617.8:2723:99:100:12;\r\nNL:3621:27:99:4721:27:99:100:12;\r\nNL:3621:2775:99:4721:2775:99:100:12;\r\nNL:4207:123:99:4207:2723:99:200:12;\r\nNL:4713.5:123:99:4713.5:2723:99:100:12;\r\n\r\nNL:23:99:112:23:2703:112:2604:15;\r\nNL:23:303:112:23:2103:112:600:15;\r\nNL:602:99:112:602:2703:112:2604:15;\r\nNL:602:303:112:602:2103:112:600:15;\r\nNL:1190.3:99:112:1190.3:2703:112:2604:15;\r\nNL:1190.3:303:112:1190.3:2103:112:600:15;\r\nNL:1213.8:99:112:1213.8:2703:112:2604:15;\r\nNL:1213.8:303:112:1213.8:2103:112:600:15;\r\nNL:1545.5:99:112:1545.5:2703:112:2604:15;\r\nNL:1545.5:303:112:1545.5:2103:112:600:15;\r\nNL:1680.5:99:112:1680.5:2703:112:2604:15;\r\nNL:1680.5:303:112:1680.5:2103:112:600:15;\r\nNL:1758:99:112:1758:2703:112:2604:15;\r\nNL:1758:303:112:1758:2103:112:600:15;\r\nNL:1803:99:112:1803:2703:112:2604:15;\r\nNL:1803:303:112:1803:2103:112:600:15;\r\nNL:2359:99:112:2359:2703:112:2604:15;\r\nNL:2359:303:112:2359:2103:112:600:15;\r\nNL:2392.3:99:112:2392.3:2703:112:2604:15;\r\nNL:2392.3:303:112:2392.3:2103:112:600:15;\r\nNL:2415.8:99:112:2415.8:2703:112:2604:15;\r\nNL:2415.8:303:112:2415.8:2103:112:600:15;\r\nNL:2960:99:112:2960:2703:112:2604:15;\r\nNL:2960:303:112:2960:2103:112:600:15;\r\nNL:3005:99:112:3005:2703:112:2604:15;\r\nNL:3005:303:112:3005:2103:112:600:15;\r\nNL:3561:99:112:3561:2703:112:2604:15;\r\nNL:3561:303:112:3561:2103:112:600:15;\r\nNL:3594.3:99:112:3594.3:2703:112:2604:15;\r\nNL:3594.3:303:112:3594.3:2103:112:600:15;\r\nNL:3617.8:99:112:3617.8:2703:112:2604:15;\r\nNL:3617.8:303:112:3617.8:2103:112:600:15;\r\nNL:4162:99:112:4162:2703:112:2604:15;\r\nNL:4162:303:112:4162:2103:112:600:15;\r\nNL:4207:99:112:4207:2703:112:2604:15;\r\nNL:4207:303:112:4207:2103:112:600:15;\r\nNL:4669.5:99:112:4669.5:2703:112:2604:15;\r\nNL:4669.5:303:112:4669.5:2103:112:600:15;\r\nNL:4701:99:112:4701:2703:112:2604:15;\r\nNL:4701:303:112:4701:2103:112:600:15;\r\n\r\nNL:613.3:59:125:613.3:2743:125:2684:15;\r\nNL:613.3:193:125:613.3:2593:125:150:15;\r\nNL:1202:59:125:1202:2743:125:2684:15;\r\nNL:1202:193:125:1202:2593:125:150:15;\r\nNL:1545.5:59:125:1545.5:2743:125:2684:15;\r\nNL:1545.5:193:125:1545.5:2593:125:150:15;\r\nNL:1680.5:59:125:1680.5:2743:125:2684:15;\r\nNL:1680.5:193:125:1680.5:2593:125:150:15;\r\nNL:1758:59:125:1758:2743:125:2684:15;\r\nNL:1758:193:125:1758:2593:125:150:15;\r\nNL:1791.3:59:125:1791.3:2743:125:2684:15;\r\nNL:1791.3:193:125:1791.3:2593:125:150:15;\r\nNL:1814.8:59:125:1814.8:2743:125:2684:15;\r\nNL:1814.8:193:125:1814.8:2593:125:150:15;\r\nNL:2359:59:125:2359:2743:125:2684:15;\r\nNL:2359:193:125:2359:2593:125:150:15;\r\nNL:2404:59:125:2404:2743:125:2684:15;\r\nNL:2404:193:125:2404:2593:125:150:15;\r\nNL:2960:59:125:2960:2743:125:2684:15;\r\nNL:2960:193:125:2960:2593:125:150:15;\r\nNL:2993.3:59:125:2993.3:2743:125:2684:15;\r\nNL:2993.3:193:125:2993.3:2593:125:150:15;\r\nNL:3016.8:59:125:3016.8:2743:125:2684:15;\r\nNL:3016.8:193:125:3016.8:2593:125:150:15;\r\nNL:3561:59:125:3561:2743:125:2684:15;\r\nNL:3561:193:125:3561:2593:125:150:15;\r\nNL:3606:59:125:3606:2743:125:2684:15;\r\nNL:3606:193:125:3606:2593:125:150:15;\r\nNL:4162:59:125:4162:2743:125:2684:15;\r\nNL:4162:193:125:4162:2593:125:150:15;\r\nNL:4195.3:59:125:4195.3:2743:125:2684:15;\r\nNL:4195.3:193:125:4195.3:2593:125:150:15;\r\nNL:4218.8:59:125:4218.8:2743:125:2684:15;\r\nNL:4218.8:193:125:4218.8:2593:125:150:15;\r\nNL:4669.5:59:125:4669.5:2743:125:2684:15;\r\nNL:4669.5:193:125:4669.5:2593:125:150:15;\r\nNL:4701:59:125:4701:2743:125:2684:15;\r\nNL:4701:193:125:4701:2593:125:150:15;\r\n\r\n\r\nROB:4735:9:99:1;\r\nRL:4735:3059:90:0;\r\nRL:4807:3059:90:0;\r\nRL:4807:9:90:0;\r\nRL:4735:9:90:0;\r\nROE;\r\nROB:4711:9:112:1;\r\nRL:4711:2793:99:0;\r\nRL:4807:2793:99:0;\r\nRL:4807:9:99:0;\r\nRL:4711:9:99:0;\r\nROE;\r\nROB:4711:9:125:1;\r\nRL:4711:2793:112:0;\r\nRL:4807:2793:112:0;\r\nRL:4807:9:112:0;\r\nRL:4711:9:112:0;\r\nROE;\r\nROB:4735:2793:99:2;\r\nRL:1:2793:90:0;\r\nROE;\r\n\r\nINK:2368.5:2802:0:MB-W-02;\r\n\r\nINK:2368.5:0:0:MB-W-02;\r\n\r\nFST:22:0:20:22:70:20:0:Standard Nail;\r\nFST:22:0:45:22:70:45:0:Standard Nail;\r\nFST:22:0:70:22:70:70:0:Standard Nail;\r\nFST:22:2802:20:22:2732:20:0:Standard Nail;\r\nFST:22:2802:45:22:2732:45:0:Standard Nail;\r\nFST:22:2802:70:22:2732:70:0:Standard Nail;\r\nFST:601.5:0:20:601.5:70:20:0:Standard Nail;\r\nFST:601.5:0:45:601.5:70:45:0:Standard Nail;\r\nFST:601.5:0:70:601.5:70:70:0:Standard Nail;\r\nFST:601.5:2802:20:601.5:2732:20:0:Standard Nail;\r\nFST:601.5:2802:45:601.5:2732:45:0:Standard Nail;\r\nFST:601.5:2802:70:601.5:2732:70:0:Standard Nail;\r\nFST:1201.5:0:20:1201.5:70:20:0:Standard Nail;\r\nFST:1201.5:0:45:1201.5:70:45:0:Standard Nail;\r\nFST:1201.5:0:70:1201.5:70:70:0:Standard Nail;\r\nFST:1201.5:2802:20:1201.5:2732:20:0:Standard Nail;\r\nFST:1201.5:2802:45:1201.5:2732:45:0:Standard Nail;\r\nFST:1201.5:2802:70:1201.5:2732:70:0:Standard Nail;\r\nFST:1545:0:20:1545:70:20:0:Standard Nail;\r\nFST:1545:0:45:1545:70:45:0:Standard Nail;\r\nFST:1545:0:70:1545:70:70:0:Standard Nail;\r\nFST:1545:2802:20:1545:2732:20:0:Standard Nail;\r\nFST:1545:2802:45:1545:2732:45:0:Standard Nail;\r\nFST:1545:2802:70:1545:2732:70:0:Standard Nail;\r\nFST:1588:0:23:1588:70:23:0:Standard Nail;\r\nFST:1588:2802:23:1588:2732:23:0:Standard Nail;\r\nFST:1613:0:23:1613:70:23:0:Standard Nail;\r\nFST:1613:2802:23:1613:2732:23:0:Standard Nail;\r\nFST:1638:0:23:1638:70:23:0:Standard Nail;\r\nFST:1638:2802:23:1638:2732:23:0:Standard Nail;\r\nFST:1680:0:20:1680:70:20:0:Standard Nail;\r\nFST:1680:0:45:1680:70:45:0:Standard Nail;\r\nFST:1680:0:70:1680:70:70:0:Standard Nail;\r\nFST:1680:2802:20:1680:2732:20:0:Standard Nail;\r\nFST:1680:2802:45:1680:2732:45:0:Standard Nail;\r\nFST:1680:2802:70:1680:2732:70:0:Standard Nail;\r\nFST:1757.5:0:20:1757.5:70:20:0:Standard Nail;\r\nFST:1757.5:0:45:1757.5:70:45:0:Standard Nail;\r\nFST:1757.5:0:70:1757.5:70:70:0:Standard Nail;\r\nFST:1757.5:2802:20:1757.5:2732:20:0:Standard Nail;\r\nFST:1757.5:2802:45:1757.5:2732:45:0:Standard Nail;\r\nFST:1757.5:2802:70:1757.5:2732:70:0:Standard Nail;\r\nFST:1802.5:0:20:1802.5:70:20:0:Standard Nail;\r\nFST:1802.5:0:45:1802.5:70:45:0:Standard Nail;\r\nFST:1802.5:0:70:1802.5:70:70:0:Standard Nail;\r\nFST:1802.5:2802:20:1802.5:2732:20:0:Standard Nail;\r\nFST:1802.5:2802:45:1802.5:2732:45:0:Standard Nail;\r\nFST:1802.5:2802:70:1802.5:2732:70:0:Standard Nail;\r\nFST:2358.5:0:20:2358.5:70:20:0:Standard Nail;\r\nFST:2358.5:0:45:2358.5:70:45:0:Standard Nail;\r\nFST:2358.5:0:70:2358.5:70:70:0:Standard Nail;\r\nFST:2358.5:2802:20:2358.5:2732:20:0:Standard Nail;\r\nFST:2358.5:2802:45:2358.5:2732:45:0:Standard Nail;\r\nFST:2358.5:2802:70:2358.5:2732:70:0:Standard Nail;\r\nFST:2403.5:0:20:2403.5:70:20:0:Standard Nail;\r\nFST:2403.5:0:45:2403.5:70:45:0:Standard Nail;\r\nFST:2403.5:0:70:2403.5:70:70:0:Standard Nail;\r\nFST:2403.5:2802:20:2403.5:2732:20:0:Standard Nail;\r\nFST:2403.5:2802:45:2403.5:2732:45:0:Standard Nail;\r\nFST:2403.5:2802:70:2403.5:2732:70:0:Standard Nail;\r\nFST:2959.5:0:20:2959.5:70:20:0:Standard Nail;\r\nFST:2959.5:0:45:2959.5:70:45:0:Standard Nail;\r\nFST:2959.5:0:70:2959.5:70:70:0:Standard Nail;\r\nFST:2959.5:2802:20:2959.5:2732:20:0:Standard Nail;\r\nFST:2959.5:2802:45:2959.5:2732:45:0:Standard Nail;\r\nFST:2959.5:2802:70:2959.5:2732:70:0:Standard Nail;\r\nFST:3004.5:0:20:3004.5:70:20:0:Standard Nail;\r\nFST:3004.5:0:45:3004.5:70:45:0:Standard Nail;\r\nFST:3004.5:0:70:3004.5:70:70:0:Standard Nail;\r\nFST:3004.5:2802:20:3004.5:2732:20:0:Standard Nail;\r\nFST:3004.5:2802:45:3004.5:2732:45:0:Standard Nail;\r\nFST:3004.5:2802:70:3004.5:2732:70:0:Standard Nail;\r\nFST:3560.5:0:20:3560.5:70:20:0:Standard Nail;\r\nFST:3560.5:0:45:3560.5:70:45:0:Standard Nail;\r\nFST:3560.5:0:70:3560.5:70:70:0:Standard Nail;\r\nFST:3560.5:2802:20:3560.5:2732:20:0:Standard Nail;\r\nFST:3560.5:2802:45:3560.5:2732:45:0:Standard Nail;\r\nFST:3560.5:2802:70:3560.5:2732:70:0:Standard Nail;\r\nFST:3605.5:0:20:3605.5:70:20:0:Standard Nail;\r\nFST:3605.5:0:45:3605.5:70:45:0:Standard Nail;\r\nFST:3605.5:0:70:3605.5:70:70:0:Standard Nail;\r\nFST:3605.5:2802:20:3605.5:2732:20:0:Standard Nail;\r\nFST:3605.5:2802:45:3605.5:2732:45:0:Standard Nail;\r\nFST:3605.5:2802:70:3605.5:2732:70:0:Standard Nail;\r\nFST:4161.5:0:20:4161.5:70:20:0:Standard Nail;\r\nFST:4161.5:0:45:4161.5:70:45:0:Standard Nail;\r\nFST:4161.5:0:70:4161.5:70:70:0:Standard Nail;\r\nFST:4161.5:2802:20:4161.5:2732:20:0:Standard Nail;\r\nFST:4161.5:2802:45:4161.5:2732:45:0:Standard Nail;\r\nFST:4161.5:2802:70:4161.5:2732:70:0:Standard Nail;\r\nFST:4206.5:0:20:4206.5:70:20:0:Standard Nail;\r\nFST:4206.5:0:45:4206.5:70:45:0:Standard Nail;\r\nFST:4206.5:0:70:4206.5:70:70:0:Standard Nail;\r\nFST:4206.5:2802:20:4206.5:2732:20:0:Standard Nail;\r\nFST:4206.5:2802:45:4206.5:2732:45:0:Standard Nail;\r\nFST:4206.5:2802:70:4206.5:2732:70:0:Standard Nail;\r\nFST:4669:0:20:4669:70:20:0:Standard Nail;\r\nFST:4669:0:45:4669:70:45:0:Standard Nail;\r\nFST:4669:0:70:4669:70:70:0:Standard Nail;\r\nFST:4669:2802:20:4669:2732:20:0:Standard Nail;\r\nFST:4669:2802:45:4669:2732:45:0:Standard Nail;\r\nFST:4669:2802:70:4669:2732:70:0:Standard Nail;\r\nFST:4714:0:20:4714:70:20:0:Standard Nail;\r\nFST:4714:0:45:4714:70:45:0:Standard Nail;\r\nFST:4714:0:70:4714:70:70:0:Standard Nail;\r\nFST:4714:2802:20:4714:2732:20:0:Standard Nail;\r\nFST:4714:2802:45:4714:2732:45:0:Standard Nail;\r\nFST:4714:2802:70:4714:2732:70:0:Standard Nail;\r\n\r\n\r\nEOF;\r\n"},{"name":"A2-B_1_ST_MB-C-01.cdt","raw":"COPYRIGHT: Randek AB. This document/file is protected by copyright proprietary to Randek AB and may only be used for the intended purpose. This document/file may not be copied, used, distributed or similar, without the prior written approval of Randek AB.;\r\n\r\nVERSION:5.0.15;\r\nTXT:====================================================;\r\nTXT:Executable;\r\nTXT:Hsb-Version;\r\nTXT:Randek-Version;\r\nTXT:Zones;\r\nTXT:FrameNailing;\r\nTXT:Rotation;\r\nTXT:Flip;\r\nTXT:Breather Paper;\r\nTXT:Branders;\r\nTXT:Insulation;\r\nTXT:Tape Nailing;\r\nTXT:Glue lines;\r\nTXT:Ink lines;\r\nTXT:Internal Wall Types;\r\nTXT:External Wall Types;\r\nTXT:Modular Wall Types;\r\nTXT:Nail Specifications;\r\nTXT:Sheet Indexes;\r\nTXT:Exclude Datum X Tags;\r\nTXT:Exclude Datum Y Tags;\r\nTXT:Exclude Datum Z Tags;\r\nTXT:Resequence sheets;\r\nTXT:====================================================;\r\nTXT:FRAMING_STATION;\r\nTXT:PANEL_IDENTIFICATION_TOPRAIL;\r\nTXT:PANEL_IDENTIFICATION_BOTTOMRAIL;\r\nTXT:NAILING_BOARD_INSIDE;\r\nPNO:pno;\r\nFL:0;\r\nSEQUENCENUMBER:0;\r\nMASS:0;\r\nELD:EXTERIOR;\r\nDNO:A2-B.1.ST_MB-C-01;\r\nELF:INSIDE;\r\nELM:4384:3113.5:150:1:4384:3113:150;\r\n\r\n\r\nTS:4384:45:150:0:3023.5:0:SFTopPlate:L=4384:WxH=45x150:q;\r\nTS:4384:45:150:0:3068.5:0:SFVeryTopPlate:L=4384:WxH=45x150:q;\r\nBS:4384:45:150:0:45:0:SFBottomPlate:L=4384:WxH=45x150:q;\r\nBS:4384:45:150:0:0:0:SFVeryBottomPlate:L=4384:WxH=45x150:q;\r\n\r\nST:45:2933.5:150:0:90:0:DakLeftEdge:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:579.5:90:0:DakCenterJoist:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:1180.5:90:0:DakCenterJoist:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:1781.5:90:0:DakCenterJoist:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:2382.5:90:0:DakCenterJoist:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:2983.5:90:0:DakCenterJoist:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:3584.5:90:0:DakCenterJoist:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:4185.5:90:0:DakRightEdge:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:4339:90:0:DakRightEdge:L=2933:WxH=45x150:q;\r\n\r\nSTL:534.5:45:90:45:640.7:0:SFBlocking:L=535:WxH=45x90:q;\r\nSTL:534.5:45:90:45:1832.1:0:SFBlocking:L=535:WxH=45x90:q;\r\nSTL:534.5:45:90:45:1236.4:0:SFBlocking:L=535:WxH=45x90:q;\r\nSTL:534.5:45:90:45:2427.8:0:SFBlocking:L=535:WxH=45x90:q;\r\nSTL:556:45:90:624.5:640.7:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:624.5:1832.1:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:624.5:1236.4:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:624.5:2427.8:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1225.5:1236.4:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1225.5:2427.8:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1225.5:640.7:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1225.5:1832.1:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1826.5:2427.8:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1826.5:1236.4:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1826.5:640.7:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1826.5:1832.1:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:150:45:2427.5:1181:0:DakCenterJoist:L=556:WxH=45x150:q;\r\nSTL:556:45:90:2427.5:2427.8:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:2427.5:640.7:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:2427.5:1832.1:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3028.5:2427.8:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3028.5:1832.1:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3028.5:640.7:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3028.5:1236.4:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3629.5:1832.1:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3629.5:1236.4:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3629.5:2414.2:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:150:3629.5:2459.2:0:SFBlocking:L=556:WxH=45x150:q;\r\nSTL:556:45:150:3629.5:609.2:0:SFBlocking:L=556:WxH=45x150:q;\r\nSTL:556:45:90:3629.5:654.2:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:108.5:45:150:4230.5:609.2:0:SFBlocking:L=108:WxH=45x150:q;\r\nSTL:108.5:45:90:4230.5:654.2:0:SFBlocking:L=108:WxH=45x90:q;\r\nSTL:108.5:45:150:4230.5:2459.2:0:SFBlocking:L=108:WxH=45x150:q;\r\nSTL:108.5:45:90:4230.5:2414.2:0:SFBlocking:L=108:WxH=45x90:q;\r\nSTL:108.5:45:90:4230.5:1236.4:0:SFBlocking:L=108:WxH=45x90:q;\r\nSTL:108.5:45:90:4230.5:1832.1:0:SFBlocking:L=108:WxH=45x90:q;\r\n\r\nBOO1:599:3600:16:2:-486.5:-16:32:M.B - Fyrchek Plaste;\r\nBOO1:1200:3600:16:603:-486.5:-16:32:M.B - Fyrchek Plaste;\r\nBOO1:1200:3600:16:1805:-486.5:-16:32:M.B - Fyrchek Plaste;\r\nBOO1:1200:3600:16:3007:-486.5:-16:32:M.B - Fyrchek Plaste;\r\nBOO1:599:3600:16:4209:-486.5:-16:32:M.B - Fyrchek Plaste;\r\n\r\nBOO2:1200:3600:16:2:-486.5:-32:32:M.B - Fyrchek Plaste;\r\nBOO2:1200:3600:16:1204:-486.5:-32:32:M.B - Fyrchek Plaste;\r\nBOO2:1200:3600:16:2406:-486.5:-32:32:M.B - Fyrchek Plaste;\r\nBOO2:1200:3600:16:3608:-486.5:-32:32:M.B - Fyrchek Plaste;\r\n\r\n\r\nNL:23.5:156.7:-16:23.5:2956.7:-16:100:15;\r\nNL:51.5:663.2:-16:451.5:663.2:-16:200:15;\r\nNL:51.5:1258.9:-16:451.5:1258.9:-16:200:15;\r\nNL:51.5:1854.6:-16:451.5:1854.6:-16:200:15;\r\nNL:51.5:2450.3:-16:451.5:2450.3:-16:200:15;\r\nNL:101.5:22.5:-16:501.5:22.5:-16:100:15;\r\nNL:101.5:3091:-16:501.5:3091:-16:100:15;\r\nNL:590.2:156.7:-16:590.2:2956.7:-16:100:15;\r\nNL:613.7:156.7:-16:613.7:2956.7:-16:100:15;\r\nNL:653:663.2:-16:1653:663.2:-16:200:15;\r\nNL:653:1258.9:-16:1653:1258.9:-16:200:15;\r\nNL:653:1854.6:-16:1653:1854.6:-16:200:15;\r\nNL:653:2450.3:-16:1653:2450.3:-16:200:15;\r\nNL:703:22.5:-16:1703:22.5:-16:100:15;\r\nNL:703:3091:-16:1703:3091:-16:100:15;\r\nNL:1203:156.7:-16:1203:2956.7:-16:200:15;\r\nNL:1792.2:156.7:-16:1792.2:2956.7:-16:100:15;\r\nNL:1815.8:156.7:-16:1815.8:2956.7:-16:100:15;\r\nNL:1905:22.5:-16:2905:22.5:-16:100:15;\r\nNL:1905:3091:-16:2905:3091:-16:100:15;\r\nNL:2005:663.2:-16:2805:663.2:-16:200:15;\r\nNL:2005:1258.9:-16:2805:1258.9:-16:200:15;\r\nNL:2005:1854.6:-16:2805:1854.6:-16:200:15;\r\nNL:2005:2450.3:-16:2805:2450.3:-16:200:15;\r\nNL:2405:156.7:-16:2405:2956.7:-16:200:15;\r\nNL:2994.3:156.7:-16:2994.3:2956.7:-16:100:15;\r\nNL:3017.7:156.7:-16:3017.7:2956.7:-16:100:15;\r\nNL:3087:663.2:-16:4287:663.2:-16:200:15;\r\nNL:3087:1258.9:-16:4287:1258.9:-16:200:15;\r\nNL:3087:1854.6:-16:4287:1854.6:-16:200:15;\r\nNL:3092:2450.3:-16:4292:2450.3:-16:200:15;\r\nNL:3157:28.5:-16:4357:28.5:-16:100:15;\r\nNL:3162:3091:-16:4362:3091:-16:100:15;\r\nNL:3607:156.7:-16:3607:2956.7:-16:200:15;\r\nNL:4196.7:156.7:-16:4196.7:2956.7:-16:100:15;\r\nNL:4219.2:156.7:-16:4219.2:2956.7:-16:100:15;\r\nNL:4359.5:156.7:-16:4359.5:2956.7:-16:100:15;\r\n\r\nNL:23.5:106.7:-32:23.5:3006.7:-32:100:15;\r\nNL:52:22.5:-32:1152:22.5:-32:100:15;\r\nNL:52:3091:-32:1152:3091:-32:100:15;\r\nNL:102:663.2:-32:1102:663.2:-32:200:15;\r\nNL:102:1258.9:-32:1102:1258.9:-32:200:15;\r\nNL:102:1854.6:-32:1102:1854.6:-32:200:15;\r\nNL:102:2450.3:-32:1102:2450.3:-32:200:15;\r\nNL:602:206.7:-32:602:3006.7:-32:200:15;\r\nNL:1191.3:106.7:-32:1191.3:3006.7:-32:100:15;\r\nNL:1214.8:106.7:-32:1214.8:3006.7:-32:100:15;\r\nNL:1254:22.5:-32:2354:22.5:-32:100:15;\r\nNL:1254:3091:-32:2354:3091:-32:100:15;\r\nNL:1304:663.2:-32:2304:663.2:-32:200:15;\r\nNL:1304:1258.9:-32:2304:1258.9:-32:200:15;\r\nNL:1304:1854.6:-32:2304:1854.6:-32:200:15;\r\nNL:1304:2450.3:-32:2304:2450.3:-32:200:15;\r\nNL:1804:206.7:-32:1804:3006.7:-32:200:15;\r\nNL:2393.3:106.7:-32:2393.3:3006.7:-32:100:15;\r\nNL:2416.8:106.7:-32:2416.8:3006.7:-32:100:15;\r\nNL:2438:22.5:-32:4338:22.5:-32:100:15;\r\nNL:2438:3091:-32:4338:3091:-32:100:15;\r\nNL:2506:663.2:-32:3506:663.2:-32:200:15;\r\nNL:2506:1258.9:-32:3506:1258.9:-32:200:15;\r\nNL:2506:1854.6:-32:3506:1854.6:-32:200:15;\r\nNL:2506:2450.3:-32:3506:2450.3:-32:200:15;\r\nNL:3006:206.7:-32:3006:3006.7:-32:200:15;\r\nNL:3595.3:106.7:-32:3595.3:3006.7:-32:100:15;\r\nNL:3617.8:106.7:-32:3617.8:3006.7:-32:100:15;\r\nNL:3670:663.2:-32:4270:663.2:-32:200:15;\r\nNL:3670:1258.9:-32:4270:1258.9:-32:200:15;\r\nNL:3670:1854.6:-32:4270:1854.6:-32:200:15;\r\nNL:3670:2450.3:-32:4270:2450.3:-32:200:15;\r\nNL:4208:206.7:-32:4208:3006.7:-32:200:15;\r\nNL:4359.5:106.7:-32:4359.5:3006.7:-32:100:15;\r\n\r\n\r\n\r\nROB:4382:-486.5:-16:1;\r\nRL:4382:3113.5:0:0;\r\nRL:4808:3113.5:0:0;\r\nRL:4808:-486.5:0:0;\r\nRL:4382:-486.5:0:0;\r\nROE;\r\nROB:4382:-486.5:-32:1;\r\nRL:4382:3113.5:-16:0;\r\nRL:4808:3113.5:-16:0;\r\nRL:4808:-486.5:-16:0;\r\nRL:4382:-486.5:-16:0;\r\nROE;\r\nROB:2:0:-16:2;\r\nRL:4382:0:0:0;\r\nROE;\r\nROB:2:0:-32:2;\r\nRL:4382:0:-16:0;\r\nROE;\r\n\r\nINK:2192:3068.5:0:MB-C-01;\r\nINK:2192:-45:0:MB-C-01;\r\n\r\nFST:22:45:21:22:115:21:0:Standard Nail;\r\nFST:22:45:57:22:115:57:0:Standard Nail;\r\nFST:22:45:93:22:115:93:0:Standard Nail;\r\nFST:22:45:129:22:115:129:0:Standard Nail;\r\nFST:22:3068.5:21:22:2998.5:21:0:Standard Nail;\r\nFST:22:3068.5:57:22:2998.5:57:0:Standard Nail;\r\nFST:22:3068.5:93:22:2998.5:93:0:Standard Nail;\r\nFST:22:3068.5:129:22:2998.5:129:0:Standard Nail;\r\nFST:601.5:45:21:601.5:115:21:0:Standard Nail;\r\nFST:601.5:45:57:601.5:115:57:0:Standard Nail;\r\nFST:601.5:45:93:601.5:115:93:0:Standard Nail;\r\nFST:601.5:45:129:601.5:115:129:0:Standard Nail;\r\nFST:601.5:3068.5:21:601.5:2998.5:21:0:Standard Nail;\r\nFST:601.5:3068.5:57:601.5:2998.5:57:0:Standard Nail;\r\nFST:601.5:3068.5:93:601.5:2998.5:93:0:Standard Nail;\r\nFST:601.5:3068.5:129:601.5:2998.5:129:0:Standard Nail;\r\nFST:1202.5:45:21:1202.5:115:21:0:Standard Nail;\r\nFST:1202.5:45:57:1202.5:115:57:0:Standard Nail;\r\nFST:1202.5:45:93:1202.5:115:93:0:Standard Nail;\r\nFST:1202.5:45:129:1202.5:115:129:0:Standard Nail;\r\nFST:1202.5:3068.5:21:1202.5:2998.5:21:0:Standard Nail;\r\nFST:1202.5:3068.5:57:1202.5:2998.5:57:0:Standard Nail;\r\nFST:1202.5:3068.5:93:1202.5:2998.5:93:0:Standard Nail;\r\nFST:1202.5:3068.5:129:1202.5:2998.5:129:0:Standard Nail;\r\nFST:1803.5:45:21:1803.5:115:21:0:Standard Nail;\r\nFST:1803.5:45:57:1803.5:115:57:0:Standard Nail;\r\nFST:1803.5:45:93:1803.5:115:93:0:Standard Nail;\r\nFST:1803.5:45:129:1803.5:115:129:0:Standard Nail;\r\nFST:1803.5:3068.5:21:1803.5:2998.5:21:0:Standard Nail;\r\nFST:1803.5:3068.5:57:1803.5:2998.5:57:0:Standard Nail;\r\nFST:1803.5:3068.5:93:1803.5:2998.5:93:0:Standard Nail;\r\nFST:1803.5:3068.5:129:1803.5:2998.5:129:0:Standard Nail;\r\nFST:2404.5:45:21:2404.5:115:21:0:Standard Nail;\r\nFST:2404.5:45:57:2404.5:115:57:0:Standard Nail;\r\nFST:2404.5:45:93:2404.5:115:93:0:Standard Nail;\r\nFST:2404.5:45:129:2404.5:115:129:0:Standard Nail;\r\nFST:2404.5:3068.5:21:2404.5:2998.5:21:0:Standard Nail;\r\nFST:2404.5:3068.5:57:2404.5:2998.5:57:0:Standard Nail;\r\nFST:2404.5:3068.5:93:2404.5:2998.5:93:0:Standard Nail;\r\nFST:2404.5:3068.5:129:2404.5:2998.5:129:0:Standard Nail;\r\nFST:3005.5:45:21:3005.5:115:21:0:Standard Nail;\r\nFST:3005.5:45:57:3005.5:115:57:0:Standard Nail;\r\nFST:3005.5:45:93:3005.5:115:93:0:Standard Nail;\r\nFST:3005.5:45:129:3005.5:115:129:0:Standard Nail;\r\nFST:3005.5:3068.5:21:3005.5:2998.5:21:0:Standard Nail;\r\nFST:3005.5:3068.5:57:3005.5:2998.5:57:0:Standard Nail;\r\nFST:3005.5:3068.5:93:3005.5:2998.5:93:0:Standard Nail;\r\nFST:3005.5:3068.5:129:3005.5:2998.5:129:0:Standard Nail;\r\nFST:3606.5:45:21:3606.5:115:21:0:Standard Nail;\r\nFST:3606.5:45:57:3606.5:115:57:0:Standard Nail;\r\nFST:3606.5:45:93:3606.5:115:93:0:Standard Nail;\r\nFST:3606.5:45:129:3606.5:115:129:0:Standard Nail;\r\nFST:3606.5:3068.5:21:3606.5:2998.5:21:0:Standard Nail;\r\nFST:3606.5:3068.5:57:3606.5:2998.5:57:0:Standard Nail;\r\nFST:3606.5:3068.5:93:3606.5:2998.5:93:0:Standard Nail;\r\nFST:3606.5:3068.5:129:3606.5:2998.5:129:0:Standard Nail;\r\nFST:4207.5:45:21:4207.5:115:21:0:Standard Nail;\r\nFST:4207.5:45:57:4207.5:115:57:0:Standard Nail;\r\nFST:4207.5:45:93:4207.5:115:93:0:Standard Nail;\r\nFST:4207.5:45:129:4207.5:115:129:0:Standard Nail;\r\nFST:4207.5:3068.5:21:4207.5:2998.5:21:0:Standard Nail;\r\nFST:4207.5:3068.5:57:4207.5:2998.5:57:0:Standard Nail;\r\nFST:4207.5:3068.5:93:4207.5:2998.5:93:0:Standard Nail;\r\nFST:4207.5:3068.5:129:4207.5:2998.5:129:0:Standard Nail;\r\nFST:4361:45:21:4361:115:21:0:Standard Nail;\r\nFST:4361:45:57:4361:115:57:0:Standard Nail;\r\nFST:4361:45:93:4361:115:93:0:Standard Nail;\r\nFST:4361:45:129:4361:115:129:0:Standard Nail;\r\nFST:4361:3068.5:21:4361:2998.5:21:0:Standard Nail;\r\nFST:4361:3068.5:57:4361:2998.5:57:0:Standard Nail;\r\nFST:4361:3068.5:93:4361:2998.5:93:0:Standard Nail;\r\nFST:4361:3068.5:129:4361:2998.5:129:0:Standard Nail;\r\n\r\n\r\nEOF;\r\n"}];
 
 // ─── Settings ─────────────────────────────────────────────────────────────
 const DEFAULTS={cStud:'#c8a26e',cPlate:'#a07840',cHeader:'#d4a44a',cSill:'#bfa060',cSheet:'#7a9a6a',cOpening:'#cc3333',cDim:'#0066cc',cMeasure:'#dd4444',dimFont:9,dimTick:3,dimLine:5,dimExt:'2,2',chainOff1:16,chainOff2:28,overallOff:42,scale:12,subColour:false,cSub0:'#2266aa',cSub1:'#aa6622',cSub2:'#22aa66',cSub3:'#aa2266',
@@ -566,16 +596,20 @@ function drawChainDims(g,elements,t){
 // Uses studs sitting on/near bottom plate (under studs), not over studs
 // One row of origin dims from x=0: clusters touching studs, labels the chosen edge (left/right).
 // dir=+1 draws below the anchor (under-studs), dir=-1 draws above (over-studs). anchorMm = frame y to hang from.
-function drawOriginRow(g,studs,t,edge,dir,anchorMm){
+function drawOriginRow(g,studs,t,edge,dir,anchorMm,baseOff){
   if(!studs.length)return;
   studs=studs.slice().sort((a,b)=>a.x-b.x);
   const blocks=[];let curL=studs[0].x,curR=studs[0].x+studs[0].w;
   for(let i=1;i<studs.length;i++){const sl=studs[i].x,sr=studs[i].x+studs[i].w;
     if(sl<=curR+2){curR=Math.max(curR,sr);}else{blocks.push({l:curL,r:curR});curL=sl;curR=sr;}}
   blocks.push({l:curL,r:curR});
-  const fs=S.dimFont,lw=DLW(),ext=DEX(),yBase=t.ty(anchorMm);
+  const fs=S.dimFont,lw=DLW(),ext=DEX(),yBase=t.ty(anchorMm),rowGap=fs+5;
+  const rows=[];                                   // collision avoidance: stack colliding labels into rows
+  function placeRow(cx,w){const half=w/2,sp={l:cx-half,r:cx+half};let r=0;
+    while(rows[r]&&rows[r].some(s=>!(sp.r<s.l||sp.l>s.r)))r++;(rows[r]||(rows[r]=[])).push(sp);return r;}
   blocks.forEach(b=>{
-    const val=Math.round(edge==='r'?b.r:b.l),sx=t.tx(val),labelY=yBase+dir*(14+fs);
+    const val=Math.round(edge==='r'?b.r:b.l),sx=t.tx(val),lblW=Math.max((''+val).length*fs*0.62,16)+4;
+    const row=placeRow(sx,lblW),labelY=yBase+dir*((baseOff||12)+fs+row*rowGap);
     const la={x1:sx,y1:yBase+dir*2,x2:sx,y2:labelY-dir*fs,stroke:DC(),'stroke-width':lw*0.6};
     if(ext)la['stroke-dasharray']=ext;mkEl('line',la,g);
     mkEl('line',{x1:sx-2,y1:labelY-dir*fs,x2:sx+2,y2:labelY-dir*fs,stroke:DC(),'stroke-width':lw},g);
@@ -585,9 +619,9 @@ function drawOriginRow(g,studs,t,edge,dir,anchorMm){
 function drawOriginDims(g,elements,t){
   const cb=document.getElementById('chkOriginR');
   const edge=(cb&&cb.checked)?'r':'l';
-  drawOriginRow(g,elements.filter(e=>e.type==='stud'&&e.y<100),t,edge,+1,0);          // under-studs, below
-  const over=elements.filter(e=>e.type==='stud'&&/jackov/i.test(e.label||''));         // over-opening studs, above
-  if(over.length){const top=Math.max.apply(null,over.map(e=>e.y+e.h));drawOriginRow(g,over,t,edge,-1,top);}
+  drawOriginRow(g,elements.filter(e=>e.type==='stud'&&e.y<100),t,edge,+1,0,16);         // under-studs, below
+  const over=elements.filter(e=>e.type==='stud'&&/jackov/i.test(e.label||''));          // over-opening studs, above
+  if(over.length){const top=Math.max.apply(null,over.map(e=>e.y+e.h));drawOriginRow(g,over,t,edge,-1,top,12);}
 }
 
 function drawStudPositionDims(g,elements,t){
@@ -810,22 +844,14 @@ function renderCutList(elements){
 const builtInFr=parseCDT(RAW);
 const fr=parseCDT(RAW);const svgEl=document.getElementById('svg');
 let cutListCollapsed=false;
-let cutListDrag=null,cutListDidDrag=false,cutListCustomPos=false;
+let cutListDrag=null,cutListDidDrag=false,cutListCustomPos=true;
 let svgView={x:0,y:0,w:0,h:0,baseW:0,baseH:0};
 function applySvgView(){svgEl.setAttribute('viewBox',`${svgView.x} ${svgView.y} ${svgView.w} ${svgView.h}`);}
 function resetSvgView(totalW,totalH){svgView={x:0,y:0,w:totalW,h:totalH,baseW:totalW,baseH:totalH};applySvgView();}
 
 let activeTab='all';
-function buildTabs(){
-  const tabsEl=document.getElementById('tabs');tabsEl.innerHTML='';
-  const mk=(id,label,dot)=>{const t=document.createElement('div');t.className='tab'+(activeTab===id?' active':'');
-    if(dot)t.innerHTML=`<span class="dot" style="background:${dot}"></span>`+label;else t.textContent=label;
-    t.onclick=()=>{activeProductionKey=null;activeTab=id;buildTabs();render();};tabsEl.appendChild(t);};
-  mk('all','Full Panel');
-  fr.subs.forEach((s,i)=>{const hasO=s.elements.some(e=>e.type==='header'||e.type==='sill');const col=S.subColour?S[SUB_COLORS[i%4]]:(hasO?S.cOpening:S.cStud);mk(''+i,`Sub ${i+1}${hasO?' ◻':''}`,col);});
-}
-buildTabs();
-function selectSub(idx){activeProductionKey=null;activeTab=''+idx;buildTabs();render();}
+function buildTabs(){}                 // single-sub app: no tabs
+function selectSub(idx){activeTab=''+idx;render();}
 
 function mirrorElementsForBack(els,W){
   return els.map(e=>({...e,x:W-e.x-e.w}));
@@ -879,7 +905,7 @@ function render(){
   let totalH=(showT?planH+gap:0)+(showF?frontH:0)+(showB?gap+planH:0);
   if(!showF&&!showT&&!showS&&!showB){totalW=200;totalH=40;}
   if(isSubView){totalW+=80;totalH+=50;}
-  if(showOriginDims){totalH+=40;}
+  if(showOriginDims){totalH+=60;}
   svgEl.setAttribute('width',totalW);svgEl.setAttribute('height',totalH);
   resetSvgView(totalW,totalH);
   const cl=document.getElementById('cutlist');
@@ -902,7 +928,7 @@ function render(){
     if(showOpenDims&&view==='front'&&!isSubView)drawOpeningCentreDims(mkEl('g',{},svgEl),elements,t);
     if(showNails&&view==='front'&&subIdx==='all')drawNails(g,fr.nails,t);
     if(showDims&&!isSubView){const gD=mkEl('g',{},svgEl);
-      if(view==='front'){drawDimV(gD,t.ty(H),t.ty(0),t.tx(0),-16,H+'');}
+      if(view==='front'){drawDimV(gD,t.ty(H),t.ty(0),t.tx(0),-16,H+'');drawDimH(gD,t.tx(0),t.tx(W),t.ty(H),-18,W+'');}
       else if(view==='top'){drawDimH(gD,t.tx(0),t.tx(W),t.ty(0),12,W+'');drawDimV(gD,t.ty(D),t.ty(0),t.tx(0),-12,D+'');}
       else if(view==='bottom'){drawDimH(gD,t.tx(0),t.tx(W),t.ty(D),12,W+'');drawDimV(gD,t.ty(0),t.ty(D),t.tx(0),-12,D+'');}
       else if(view==='side'){drawDimH(gD,t.tx(0),t.tx(D),t.ty(0),12,D+'');drawDimV(gD,t.ty(H),t.ty(0),t.tx(0),-12,H+'');}}
@@ -928,7 +954,6 @@ function render(){
   window._gMeasure=mkEl('g',{},svgEl);
   window._gSnap=mkEl('g',{},svgEl);
   renderCutList(elements);
-  updateCurrentBuildPanel();
 }
 
 // ─── Click ────────────────────────────────────────────────────────────────
@@ -1005,355 +1030,6 @@ document.getElementById('btnMeasure').onclick=()=>{measureActive=!measureActive;
 document.getElementById('btnClear').onclick=()=>{if(window._gMeasure)window._gMeasure.innerHTML='';if(window._gSnap)window._gSnap.innerHTML='';measureP1=null;document.getElementById('mStatus').textContent='';};
 document.getElementById('btnZoomReset').onclick=()=>resetSvgView(svgView.baseW,svgView.baseH);
 ['chkFront','chkBackView','chkTop','chkSide','chkBottom','chkHideKing','chkDims','chkStudDims','chkOpenDims','chkSpecs','chkRouting','chkNails','chkSheets','chkOriginDims','chkOriginR','chkCutEnds','chkSheetSide','chkCutList'].forEach(id=>{const el=document.getElementById(id);if(el)el.onchange=render;});
-document.getElementById('btnProduction').onclick=()=>setProductionMode(!productionMode);
-document.getElementById('btnImportList').onclick=()=>document.getElementById('productionInput').click();
-document.getElementById('productionInput').onchange=e=>{
-  const file=e.target.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=ev=>{
-    productionList=parseCSV(ev.target.result);
-    setProductionMode(true);
-    e.target.value='';
-  };
-  reader.readAsText(file);
-};
-document.getElementById('btnExportRemaining').onclick=()=>{
-  const rows=[['order','panel','sub','size','station','notes']];
-  productionItems().filter(it=>builtStatus[it.key]!=='built').forEach(it=>rows.push([it.order===999999?'':it.order,it.panel,it.subIdx+1,it.size,it.station,it.notes]));
-  downloadCSV('remaining-subs.csv',rows);
-};
-document.getElementById('btnExportLog').onclick=()=>{
-  const rows=[['time','action','sub']];
-  builtLog.forEach(e=>rows.push([e.time,e.action,e.label]));
-  downloadCSV('built-log.csv',rows);
-};
-document.getElementById('btnHideBuilt').onclick=()=>{hideBuilt=!hideBuilt;renderProductionBoard();};
-document.getElementById('btnClearBuilt').onclick=()=>{
-  if(!confirm('Clear all built ticks and log entries?'))return;
-  builtStatus={};builtLog=[];lastBuiltKey=null;saveProductionState();renderProductionBoard();updateCurrentBuildPanel();
-};
-document.getElementById('currentBuildCheck').onchange=e=>{
-  const item=currentProductionItem();
-  if(item)setBuilt(item,e.target.checked,{advance:true});
-};
-
-// ─── File sidebar ─────────────────────────────────────────────────────────
-const sidebar=document.getElementById('sidebar');
-document.getElementById('sidebarToggle').onclick=()=>{sidebar.classList.add('open');document.body.classList.add('sidebar-open');};
-document.getElementById('sidebarClose').onclick=()=>{sidebar.classList.remove('open');document.body.classList.remove('sidebar-open');};
-
-let loadedFiles=[]; // {name, raw, fr}
-let activeFileIdx=-1; // -1 = use built-in RAW
-if(Array.isArray(SAMPLE_CDTS)){
-  loadedFiles=SAMPLE_CDTS.map(s=>({name:s.name,raw:s.raw,fr:parseCDT(s.raw)})).filter(f=>f.fr.W>0);
-}
-
-function renderMiniSvg(frData){
-  // returns an SVG string for a tiny preview (front view only)
-  const sc=0.03,pad=4;
-  const w=frData.W*sc+pad*2, h=frData.H*sc+pad*2;
-  const els=[...frData.elements,...frData.subs.flatMap(s=>s.elements)];
-  let rects='';
-  els.forEach(el=>{
-    if(el.type==='sheet')return;
-    const rx=pad+el.x*sc, ry=pad+(frData.H-el.y-el.h)*sc, rw=el.w*sc, rh=el.h*sc;
-    if(rw<0.2||rh<0.2)return;
-    const c=el.type==='plate'?'#a07840':el.type==='header'?'#d4a44a':el.type==='sill'?'#bfa060':'#c8a26e';
-    rects+=`<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${c}" stroke="#555" stroke-width="0.2"/>`;
-  });
-  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${rects}</svg>`;
-}
-
-// ─── Production board ─────────────────────────────────────────────────────
-let productionMode=false;
-let productionList=null;
-let builtStatus={};
-let builtLog=[];
-let activeProductionKey=null;
-let lastBuiltKey=null;
-let hideBuilt=false;
-try{builtStatus=JSON.parse(localStorage.getItem('cdtProductionStatus')||'{}');}catch(e){builtStatus={};}
-try{builtLog=JSON.parse(localStorage.getItem('cdtProductionLog')||'[]');}catch(e){builtLog=[];}
-try{lastBuiltKey=localStorage.getItem('cdtProductionLastBuilt')||null;}catch(e){lastBuiltKey=null;}
-
-function saveProductionState(){
-  try{
-    localStorage.setItem('cdtProductionStatus',JSON.stringify(builtStatus));
-    localStorage.setItem('cdtProductionLog',JSON.stringify(builtLog.slice(-250)));
-    if(lastBuiltKey)localStorage.setItem('cdtProductionLastBuilt',lastBuiltKey);else localStorage.removeItem('cdtProductionLastBuilt');
-  }catch(e){}
-}
-
-function getProductionSources(){
-  if(loadedFiles.length){
-    return loadedFiles.map((f,i)=>({name:f.name,fr:f.fr,fileIdx:i,key:'file:'+f.name}));
-  }
-  return [{name:'Built-in sample',fr:builtInFr,fileIdx:-1,key:'built-in'}];
-}
-
-function parseCSV(text){
-  const rows=[];let row=[],cell='',q=false;
-  for(let i=0;i<text.length;i++){
-    const ch=text[i],nx=text[i+1];
-    if(ch==='"'&&q&&nx==='"'){cell+='"';i++;}
-    else if(ch==='"')q=!q;
-    else if(ch===','&&!q){row.push(cell.trim());cell='';}
-    else if((ch==='\n'||ch==='\r')&&!q){if(ch==='\r'&&nx==='\n')i++;row.push(cell.trim());if(row.some(v=>v!==''))rows.push(row);row=[];cell='';}
-    else cell+=ch;
-  }
-  row.push(cell.trim());if(row.some(v=>v!==''))rows.push(row);
-  if(!rows.length)return[];
-  const header=rows[0].map(h=>h.toLowerCase());
-  return rows.slice(1).map(r=>{
-    const obj={};header.forEach((h,i)=>obj[h]=r[i]||'');
-    return obj;
-  });
-}
-
-function csvEscape(v){
-  const s=String(v==null?'':v);
-  return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
-}
-
-function downloadCSV(name,rows){
-  const blob=new Blob([rows.map(r=>r.map(csvEscape).join(',')).join('\n')],{type:'text/csv'});
-  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
-  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
-}
-
-function buildSubItem(src,subIdx,row={},copy=1){
-  const sub=src.fr.subs[subIdx];
-  const order=+(row.order||0)||999999;
-  const qty=+(row.qty||1)||1;
-  const key=[src.key,sub.uuid||subIdx,row.order||'auto',copy].join('|');
-  const hasOpening=sub.elements.some(e=>e.type==='header'||e.type==='sill');
-  return {
-    key,src,sub,subIdx,order,copy,qty,
-    station:row.station||'',notes:row.notes||'',panel:src.name,
-    label:`${src.name} - Sub ${subIdx+1}`,
-    size:`${Math.round(sub.w)}x${Math.round(sub.h)}`,
-    hasOpening
-  };
-}
-
-function productionItems(){
-  const sources=getProductionSources();
-  const items=[];
-  if(!productionList){
-    sources.forEach(src=>src.fr.subs.forEach((sub,i)=>items.push(buildSubItem(src,i))));
-    return sortProductionItems(items);
-  }
-  productionList.forEach(row=>{
-    const panel=(row.panel||row.file||row.filename||'').toLowerCase();
-    const subSpec=(row.sub||row.subassembly||row.sub_no||'all').toLowerCase();
-    const qty=Math.max(1,+(row.qty||1)||1);
-    const matches=sources.filter(src=>!panel||src.name.toLowerCase()===panel||src.name.toLowerCase().includes(panel)||panel.includes(src.name.toLowerCase()));
-    matches.forEach(src=>{
-      const subIdxs=subSpec==='all'||subSpec===''?src.fr.subs.map((_,i)=>i):[Math.max(0,(+subSpec||1)-1)];
-      subIdxs.forEach(si=>{
-        if(!src.fr.subs[si])return;
-        for(let copy=1;copy<=qty;copy++)items.push(buildSubItem(src,si,row,copy));
-      });
-    });
-  });
-  return sortProductionItems(items);
-}
-
-function sortProductionItems(items){
-  return items.sort((a,b)=>{
-    return a.order-b.order||a.panel.localeCompare(b.panel)||a.subIdx-b.subIdx||a.copy-b.copy;
-  });
-}
-
-function renderMiniSub(item){
-  const sub=item.sub,sc=Math.min(0.055,170/Math.max(sub.w,1),70/Math.max(sub.h,1)),pad=5;
-  const w=sub.w*sc+pad*2,h=sub.h*sc+pad*2;
-  let rects='';
-  sub.elements.forEach(el=>{
-    if(el.type==='sheet')return;
-    const rx=pad+(el.x-sub.x)*sc,ry=pad+(sub.h-(el.y-sub.y)-el.h)*sc,rw=el.w*sc,rh=el.h*sc;
-    if(rw<0.2||rh<0.2)return;
-    const c=el.type==='header'?'#d4a44a':el.type==='sill'?'#bfa060':'#c8a26e';
-    rects+=`<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${c}" stroke="#555" stroke-width="0.35"/>`;
-  });
-  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${rects}</svg>`;
-}
-
-function renderBuildLog(){
-  const ul=document.getElementById('buildLog');ul.innerHTML='';
-  builtLog.slice(-80).reverse().forEach(entry=>{
-    const li=document.createElement('li');
-    li.innerHTML=`<span>${entry.action}: ${entry.label}</span><span class="time">${entry.time}</span>`;
-    ul.appendChild(li);
-  });
-}
-
-function currentSourceKey(){
-  if(activeFileIdx===-1)return 'built-in';
-  const f=loadedFiles[activeFileIdx];
-  return f?'file:'+f.name:'built-in';
-}
-
-function currentProductionItem(){
-  if(activeTab==='all')return null;
-  const items=productionItems();
-  if(activeProductionKey){
-    const exact=items.find(it=>it.key===activeProductionKey);
-    if(exact)return exact;
-  }
-  const srcKey=currentSourceKey();
-  const idx=+activeTab;
-  return items.find(it=>it.src.key===srcKey&&it.subIdx===idx)||null;
-}
-
-function selectProductionItem(item){
-  activeProductionKey=item.key;
-  activeFileIdx=item.src.fileIdx;
-  activeTab=''+item.subIdx;
-  switchFile(false);
-  renderProductionBoard();
-}
-
-function setBuilt(item,isBuilt,opts={}){
-  const wasBuilt=builtStatus[item.key]==='built';
-  if(isBuilt&&!wasBuilt&&!confirm(`Mark ${item.label}${item.copy>1?' #'+item.copy:''} as built?`)){
-    renderProductionBoard();
-    updateCurrentBuildPanel();
-    return false;
-  }
-  builtStatus[item.key]=isBuilt?'built':'open';
-  if(isBuilt)lastBuiltKey=item.key;
-  else if(lastBuiltKey===item.key)lastBuiltKey=null;
-  builtLog.push({time:new Date().toLocaleString(),action:isBuilt?'Built':'Reopened',label:item.label});
-  saveProductionState();
-  renderProductionBoard();
-  updateCurrentBuildPanel();
-  if(isBuilt&&opts.advance){
-    const ordered=productionItems();
-    const idx=ordered.findIndex(it=>it.key===item.key);
-    const next=ordered.slice(idx+1).find(it=>builtStatus[it.key]!=='built')||ordered.find(it=>builtStatus[it.key]!=='built');
-    if(next)selectProductionItem(next);
-  }
-  return true;
-}
-
-function updateCurrentBuildPanel(){
-  const panel=document.getElementById('currentBuild');
-  const item=currentProductionItem();
-  if(!item){panel.classList.remove('open');return;}
-  panel.classList.add('open');
-  document.getElementById('currentBuildTitle').textContent=`${item.label}${item.copy>1?' #'+item.copy:''}`;
-  document.getElementById('currentBuildMeta').textContent=`${item.size}${item.station?' | '+item.station:''}${item.notes?' | '+item.notes:''}`;
-  document.getElementById('currentBuildCheck').checked=builtStatus[item.key]==='built';
-}
-
-function renderProductionBoard(){
-  const grid=document.getElementById('subGrid');
-  const items=productionItems();
-  const built=items.filter(it=>builtStatus[it.key]==='built').length;
-  document.getElementById('productionSummary').textContent=`${built}/${items.length} built | ${getProductionSources().length} CDT file(s) | ${productionList?productionList.length+' list row(s)':'all loaded subs'}`;
-  document.getElementById('productionHint').textContent=productionList?`${productionList.length} production list row(s) loaded`:'No production list loaded';
-  document.getElementById('btnHideBuilt').classList.toggle('active',hideBuilt);
-  document.getElementById('btnHideBuilt').textContent=hideBuilt?'Show Built':'Hide Built';
-  grid.innerHTML='';
-  const visibleItems=hideBuilt?items.filter(it=>builtStatus[it.key]!=='built'):items;
-  if(!visibleItems.length){grid.innerHTML='<div class="empty-board">No matching subs. Load CDT files or check the production-list panel/sub names.</div>';renderBuildLog();return;}
-  visibleItems.forEach(item=>{
-    const status=builtStatus[item.key]||'open';
-    const card=document.createElement('div');
-    const isActive=activeProductionKey===item.key||(!activeProductionKey&&activeTab!=='all'&&item.src.key===currentSourceKey()&&item.subIdx===+activeTab);
-    card.className='sub-card '+(status==='built'?'built ':'')+(isActive?'active':'');
-    card.dataset.key=item.key;
-    card.innerHTML=`<input type="checkbox" ${status==='built'?'checked':''} aria-label="Built">
-      ${renderMiniSub(item)}
-      <div>
-        <h4>${item.order===999999?'':item.order+'. '}${item.label}${item.copy>1?' #'+item.copy:''}</h4>
-        <div class="meta"><span>${item.size}</span><span>${item.hasOpening?'Opening sub':'Straight sub'}</span><span class="status-pill">${status==='built'?'Built':'Open'}</span></div>
-        <div class="notes">${item.station?item.station+' - ':''}${item.notes||''}</div>
-      </div>`;
-    card.onclick=()=>selectProductionItem(item);
-    const chk=card.querySelector('input');
-    chk.onclick=e=>{
-      e.stopPropagation();
-      setBuilt(item,chk.checked,{advance:true});
-    };
-    grid.appendChild(card);
-  });
-  const activeTarget=grid.querySelector('.sub-card.active');
-  if(activeTarget)activeTarget.scrollIntoView({block:'nearest'});
-  renderBuildLog();
-}
-
-function setProductionMode(on){
-  productionMode=on;
-  document.getElementById('btnProduction').classList.toggle('active',on);
-  document.getElementById('productionBoard').classList.toggle('open',on);
-  document.body.classList.toggle('production-open',on);
-  if(on)renderProductionBoard();
-}
-
-function refreshFileList(){
-  const ul=document.getElementById('fileList');ul.innerHTML='';
-  // built-in
-  const liB=document.createElement('li');liB.className='file-item'+(activeFileIdx===-1?' active':'');
-  liB.innerHTML=`<span class="fname">Built-in sample</span><span class="finfo">${builtInFr.W}×${builtInFr.H} | ${builtInFr.subs.length} subs</span>`;
-  liB.innerHTML+=renderMiniSvg(builtInFr);
-  liB.onclick=()=>{activeProductionKey=null;activeFileIdx=-1;switchFile();};
-  ul.appendChild(liB);
-  loadedFiles.forEach((f,i)=>{
-    const li=document.createElement('li');li.className='file-item'+(activeFileIdx===i?' active':'');
-    li.innerHTML=`<span class="fname">${f.name}</span><span class="finfo">${f.fr.W}×${f.fr.H} | ${f.fr.subs.length} subs</span>`;
-    li.innerHTML+=renderMiniSvg(f.fr);
-    li.onclick=()=>{activeProductionKey=null;activeFileIdx=i;switchFile();};
-    ul.appendChild(li);
-  });
-}
-
-function switchFile(resetTab=true){
-  // reload global fr reference... we need to re-assign
-  // since fr is const, we swap the data
-  const src=activeFileIdx===-1?builtInFr:loadedFiles[activeFileIdx].fr;
-  // overwrite fr fields
-  fr.W=src.W;fr.H=src.H;fr.D=src.D;
-  fr.elements=src.elements;fr.openings=src.openings;fr.labels=src.labels;fr.nails=src.nails;fr.subs=src.subs;
-  if(resetTab)activeTab='all';
-  buildTabs();refreshFileList();render();if(productionMode)renderProductionBoard();
-}
-
-// file input
-const fileInput=document.getElementById('fileInput');
-document.getElementById('uploadArea').onclick=()=>fileInput.click();
-fileInput.onchange=e=>{
-  const files=[...e.target.files].filter(f=>f.name.toLowerCase().endsWith('.cdt'));
-  files.forEach(file=>{
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      const raw=ev.target.result;
-      const parsed=parseCDT(raw);
-      if(parsed.W>0){
-        loadedFiles.push({name:file.name,raw,fr:parsed});
-        refreshFileList();if(productionMode)renderProductionBoard();
-      }
-    };
-    reader.readAsText(file);
-  });
-};
-// drag and drop
-document.getElementById('uploadArea').ondragover=e=>{e.preventDefault();e.currentTarget.style.borderColor='#68a';};
-document.getElementById('uploadArea').ondragleave=e=>{e.currentTarget.style.borderColor='#ccc';};
-document.getElementById('uploadArea').ondrop=e=>{
-  e.preventDefault();e.currentTarget.style.borderColor='#ccc';
-  const files=[...e.dataTransfer.files].filter(f=>f.name.toLowerCase().endsWith('.cdt'));
-  files.forEach(file=>{
-    const reader=new FileReader();
-    reader.onload=ev=>{
-      const raw=ev.target.result;const parsed=parseCDT(raw);
-      if(parsed.W>0){loadedFiles.push({name:file.name,raw,fr:parsed});refreshFileList();if(productionMode)renderProductionBoard();}
-    };
-    reader.readAsText(file);
-  });
-};
-
 // ─── QR / V1 payload loading ────────────────────────────────────────────────
 let subMeta={name:'',elf:'I',ref:''};
 function loadV1(code){
@@ -1425,8 +1101,11 @@ function closeScanner(){
   const pb=document.getElementById('scanPasteBtn');if(pb)pb.onclick=()=>{if(loadV1(document.getElementById('scanPaste').value))closeScanner();};
   const pi=document.getElementById('scanPaste');if(pi)pi.addEventListener('keydown',e=>{if(e.key==='Enter'&&loadV1(pi.value))closeScanner();}); }
 
-refreshFileList();
-if(!loadV1FromHash()) render();
+function renderEmptyOrDemo(){
+  const lbl=document.getElementById('v1sub'); if(lbl) lbl.textContent='Demo — tap 📷 Scan';
+  render();
+}
+if(!loadV1FromHash()) renderEmptyOrDemo();
 </script>
 </body>
 </html>
