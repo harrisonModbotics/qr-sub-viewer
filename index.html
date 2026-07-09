@@ -487,19 +487,32 @@ function drawBox(g,el,view,t){const p=projectBox(el,view);const x=t.tx(p.x),y=t.
 function drawEls(g,els,v,t){els.forEach(el=>drawBox(g,el,v,t));}
 function drawOpenings(g,openings,t){openings.forEach(poly=>{mkEl('polygon',{points:poly.map(p=>`${t.tx(p.x)},${t.ty(p.y)}`).join(' '),fill:'none',stroke:S.cOpening,'stroke-width':1},g);});}
 function drawNails(g,nails,t){nails.forEach(n=>mkEl('circle',{cx:t.tx(n.x1),cy:t.ty(n.y1),r:1.5,fill:'red',opacity:0.6},g));}
-// X on each framing member's two cut ends (short edges of the projected box)
+// X marks a cut-end cross-section. A single corner-to-corner cross is drawn where the end is
+// seen face-on (studs in plan; headers/plates in side); in the FRONT elevation the two
+// length-ends are marked. Members whose length lies in-plane in a plan/side view get no mark
+// (avoids the litter of X's along the plate/header run).
+function memberLenAxis(el){
+  if(el.type==='plate'||el.type==='header'||el.type==='sill')return 'x';
+  if(el.type==='stud'&&/block|nog/i.test(el.label||''))return 'x';
+  return el.type==='stud'?'y':'x';
+}
 function drawCutEnds(g,els,view,t){
+  function cross(ax,ay,bw,bh){
+    mkEl('line',{x1:ax,y1:ay,x2:ax+bw,y2:ay+bh,stroke:'#333','stroke-width':0.7,opacity:0.7},g);
+    mkEl('line',{x1:ax+bw,y1:ay,x2:ax,y2:ay+bh,stroke:'#333','stroke-width':0.7,opacity:0.7},g);
+  }
   els.forEach(el=>{
     if(el.type==='sheet')return;
     const p=projectBox(el,view);if(!p)return;
     const x=t.tx(p.x),y=t.ty(p.y+p.h),w=t.ts(p.w),h=t.ts(p.h);
-    if(w<3||h<3)return;
-    const s=Math.min(w,h);
-    const ends=(h>=w)?[[x,y,w,s],[x,y+h-s,w,s]]:[[x,y,s,h],[x+w-s,y,s,h]];
-    ends.forEach(e=>{const ax=e[0],ay=e[1],bw=e[2],bh=e[3];
-      mkEl('line',{x1:ax,y1:ay,x2:ax+bw,y2:ay+bh,stroke:'#333','stroke-width':0.6,opacity:0.65},g);
-      mkEl('line',{x1:ax+bw,y1:ay,x2:ax,y2:ay+bh,stroke:'#333','stroke-width':0.6,opacity:0.65},g);
-    });
+    if(w<2||h<2)return;
+    const len=memberLenAxis(el);
+    const faceOn=(view==='top'||view==='bottom')?(len==='y'):(view==='side')?(len==='x'):false;
+    if(faceOn){cross(x,y,w,h);return;}                      // whole cross-section = the end face
+    if(view==='front'){
+      if(len==='y'){const s=Math.min(w,h*0.4);cross(x,y,w,s);cross(x,y+h-s,w,s);}   // stud: top & bottom
+      else{const s=Math.min(h,w*0.4);cross(x,y,s,h);cross(x+w-s,y,s,h);}            // header/plate: left & right
+    }
   });
 }
 // hatched strip on the sheeted face of the front view (driven by ELF)
@@ -818,7 +831,8 @@ function buildCutList(elements){
     else if(el.type==='sill')typeName='Sill';
     else if(el.type==='stud')typeName=studType(el.label);
     else typeName=el.type;
-    const dim=`${el.cd}×${el.cw}`;
+    const a=Math.max(el.cw||0,el.cd||0),b=Math.min(el.cw||0,el.cd||0);
+    const dim=`${a}×${b}`;                 // normalise to larger×smaller (140×45, not 45×140)
     const len=el.len;
     const key=`${typeName}|${dim}|${len}`;
     if(!groups[key])groups[key]={type:typeName,dim,len,qty:0};
