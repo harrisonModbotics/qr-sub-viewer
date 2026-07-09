@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Make QR — QR Sub Viewer (dev)</title>
+<script src="qr-codec.js"></script>
+<script src="vendor/qrcode.min.js"></script>
+<style>
+  body { font-family:sans-serif; margin:16px; color:#222; }
+  h2 { margin:0 0 4px; } p.sub { color:#666; margin:0 0 12px; font-size:13px; }
+  .bar { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:12px; padding:8px 10px; background:#f4f4f4; border:1px solid #ddd; border-radius:4px; font-size:13px; }
+  .bar input, .bar select { font-size:12px; padding:2px 5px; border:1px solid #bbb; border-radius:3px; }
+  #subs { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+  #subs button { font-size:11px; padding:4px 9px; border:1px solid #aac; border-radius:3px; background:#fff; cursor:pointer; }
+  #subs button.on { background:#e8f0ff; border-color:#68a; font-weight:bold; }
+  #out { display:flex; gap:22px; align-items:flex-start; flex-wrap:wrap; }
+  .qr { border:1px solid #eee; padding:8px; background:#fff; }
+  .qr svg { width:280px; height:280px; display:block; }
+  .meta { max-width:460px; }
+  .meta textarea { width:100%; height:120px; font-family:monospace; font-size:11px; border:1px solid #ccc; border-radius:3px; padding:6px; box-sizing:border-box; }
+  .pill { display:inline-block; background:#eef5ff; border:1px solid #b8cde8; border-radius:12px; padding:2px 9px; font-size:12px; margin-right:6px; }
+  .warn { color:#b00; }
+  a.applink { font-size:13px; }
+</style>
+</head>
+<body>
+<h2>Make QR <span style="font-weight:normal;color:#888;font-size:14px">— dev tool</span></h2>
+<p class="sub">Load one or more <b>.cdt</b> files → pick a sub → get its <b>V1</b> code + QR. Scan the QR with the app, or use the desktop link to render it directly.</p>
+<div class="bar">
+  <label>CDT files <input type="file" id="file" multiple accept=".cdt"></label>
+  <label>Error correction <select id="ecc"><option>M</option><option>L</option><option>Q</option><option>H</option></select></label>
+  <label>App URL <input id="appurl" value="index.html" style="width:180px"></label>
+  <span id="libwarn" class="warn"></span>
+</div>
+<div id="subs"></div>
+<div id="out"></div>
+
+<script>
+if (typeof qrcode === 'undefined') {
+  document.getElementById('libwarn').textContent = '⚠ vendor/qrcode.min.js failed to load — QR images disabled (codes still shown).';
+}
+var all = [], sel = -1;
+function isUuid(s){ return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s||''); }
+function refFromName(n){ var b=n.replace(/\.cdt$/i,''); var m=b.match(/([A-Za-z0-9]+-[A-Za-z0-9]+-\d+)$/); return m?m[1]:b; }
+
+document.getElementById('file').onchange = function(e){
+  all = []; sel = -1;
+  var files = [].slice.call(e.target.files).filter(function(f){ return /\.cdt$/i.test(f.name); });
+  var pending = files.length;
+  if (!pending){ renderList(); return; }
+  files.forEach(function(file){
+    var rd = new FileReader();
+    rd.onload = function(ev){
+      var fr = QRCodec.parseCDT(ev.target.result);
+      var ref = refFromName(file.name);
+      fr.subs.forEach(function(s,i){
+        var nm = (s.uuid && !isUuid(s.uuid)) ? s.uuid : '';
+        all.push({ label:(nm||('Sub '+(i+1)))+' · '+file.name, sub:s, ref:ref, name:nm });
+      });
+      if (--pending === 0) renderList();
+    };
+    rd.readAsText(file);
+  });
+};
+document.getElementById('ecc').onchange = function(){ if(sel>=0) showSub(sel); };
+document.getElementById('appurl').oninput = function(){ if(sel>=0) showSub(sel); };
+
+function renderList(){
+  var d = document.getElementById('subs');
+  d.innerHTML = '<b style="align-self:center">'+all.length+' subs</b>';
+  all.forEach(function(it,i){
+    var b = document.createElement('button');
+    b.textContent = it.label; b.onclick = function(){ showSub(i); };
+    d.appendChild(b);
+  });
+  if (all.length) showSub(0); else document.getElementById('out').innerHTML='';
+}
+
+function showSub(i){
+  sel = i;
+  [].forEach.call(document.querySelectorAll('#subs button'), function(b,bi){ b.className = (bi===i)?'on':''; });
+  var it = all[i], ecc = document.getElementById('ecc').value;
+  var code = QRCodec.encodeV1(it.sub, { name:it.name, ref:it.ref, elf:'I' });
+  var qrHtml = '', ver = '';
+  if (typeof qrcode !== 'undefined') {
+    try {
+      var qr = qrcode(0, ecc); qr.addData(code, 'Alphanumeric'); qr.make();
+      ver = 'QR v' + qr.getModuleCount() + '×' + qr.getModuleCount() + ' modules';
+      qrHtml = qr.createSvgTag({ cellSize:6, margin:4 });
+    } catch(err) { qrHtml = '<p class="warn">QR error: '+err.message+'</p>'; }
+  }
+  var appurl = document.getElementById('appurl').value;
+  var link = appurl + '#' + code;
+  document.getElementById('out').innerHTML =
+    '<div class="qr">' + qrHtml + '</div>' +
+    '<div class="meta"><h3 style="margin:0 0 8px">'+it.label+'</h3>' +
+    '<p><span class="pill">'+code.length+' chars</span><span class="pill">alphanumeric</span><span class="pill">'+ver+'</span></p>' +
+    '<textarea readonly onclick="this.select()">'+code+'</textarea>' +
+    '<p><a class="applink" href="'+link+'" target="_blank">▶ Open in app (desktop test)</a></p></div>';
+}
+</script>
+</body>
+</html>

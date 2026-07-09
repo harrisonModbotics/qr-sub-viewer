@@ -1,0 +1,1337 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+  body { font-family:sans-serif; margin:8px; }
+  svg#svg { border:1px solid #ccc; background:#fafafa; cursor:grab; vertical-align:top; display:block; touch-action:none; }
+  svg#svg.measuring { cursor:crosshair; }
+  svg#svg.panning { cursor:grabbing; }
+  text { font-size:12px; }
+  .toolbar { display:flex; gap:8px; align-items:center; margin-bottom:4px; flex-wrap:wrap; padding:6px 10px; background:#f0f0f0; border:1px solid #ccc; border-radius:4px; font-size:12px; }
+  .toolbar label { cursor:pointer; user-select:none; color:#333; }
+  .toolbar .sep { width:1px; height:18px; background:#ccc; }
+  .toolbar button { font-size:11px; padding:2px 8px; border:1px solid #999; border-radius:3px; background:#fff; cursor:pointer; }
+  .toolbar button:hover { background:#eee; }
+  .toolbar button.active { background:#d44; color:#fff; border-color:#d44; }
+  .mstat { font-size:11px; color:#666; font-family:monospace; }
+  .production-hint { font-size:11px; color:#666; }
+  .tabs { display:flex; gap:0; margin-bottom:6px; flex-wrap:wrap; }
+  .tab { padding:4px 12px; font-size:11px; border:1px solid #ccc; border-bottom:none; background:#e8e8e8; cursor:pointer; user-select:none; border-radius:4px 4px 0 0; margin-right:-1px; color:#555; }
+  .tab:hover { background:#ddd; }
+  .tab.active { background:#fafafa; color:#000; font-weight:bold; border-bottom:1px solid #fafafa; position:relative; z-index:1; }
+  .tab .dot { display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; }
+  .main-area { display:inline-block; position:relative; vertical-align:top; }
+  .cutlist { position:absolute; z-index:5; border:1px solid #bbb; border-radius:4px; background:rgba(255,255,255,0.94); font-size:10px; width:245px; max-height:210px; overflow:auto; box-shadow:0 2px 8px rgba(0,0,0,0.12); }
+  .cutlist.hidden { display:none; }
+  .cutlist.collapsed { width:160px; max-height:none; overflow:hidden; }
+  .cutlist.collapsed table { display:none; }
+  .cutlist h4 { margin:0; padding:5px 8px; background:#f0f0f0; border-bottom:1px solid #ccc; font-size:11px; cursor:pointer; user-select:none; }
+  .cutlist table { width:100%; border-collapse:collapse; }
+  .cutlist th { text-align:left; padding:2px 5px; background:#f8f8f8; border-bottom:1px solid #ddd; font-size:9px; color:#666; text-transform:uppercase; }
+  .cutlist td { padding:2px 5px; border-bottom:1px solid #f0f0f0; font-family:monospace; font-size:10px; }
+  .cutlist tr:hover { background:#f5f5ff; }
+  .settings-overlay { display:none; position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.3); z-index:100; }
+  .settings-overlay.open { display:flex; justify-content:center; align-items:flex-start; padding-top:30px; }
+  .settings-panel { background:#fff; border:1px solid #ccc; border-radius:6px; padding:16px 20px; width:440px; box-shadow:0 4px 20px rgba(0,0,0,0.15); max-height:85vh; overflow-y:auto; }
+  .settings-panel h3 { margin:0 0 10px; font-size:14px; color:#333; }
+  .settings-panel .row { display:flex; align-items:center; gap:6px; margin-bottom:5px; }
+  .settings-panel .row label { font-size:11px; color:#555; width:120px; flex-shrink:0; }
+  .settings-panel .row input[type=color] { width:28px; height:20px; border:1px solid #ccc; padding:0; cursor:pointer; }
+  .settings-panel .row input[type=range] { flex:1; }
+  .settings-panel .row input[type=number] { width:50px; font-size:11px; padding:1px 3px; border:1px solid #ccc; border-radius:2px; }
+  .settings-panel .row select { font-size:11px; padding:1px 3px; border:1px solid #ccc; border-radius:2px; }
+  .settings-panel .row .val { font-size:10px; color:#888; font-family:monospace; width:36px; text-align:right; }
+  .settings-panel .section { font-size:10px; color:#999; text-transform:uppercase; letter-spacing:0.5px; margin:10px 0 4px; border-top:1px solid #eee; padding-top:6px; font-weight:bold; }
+  .settings-panel button { margin-top:8px; padding:4px 14px; font-size:11px; border:1px solid #ccc; border-radius:3px; background:#f5f5f5; cursor:pointer; }
+  .settings-panel button:hover { background:#eee; }
+  .settings-panel .sub-section { font-size:10px; color:#bbb; margin:6px 0 3px; font-style:italic; }
+
+  /* File sidebar */
+  .sidebar-toggle { position:fixed; left:0; top:50%; transform:translateY(-50%); z-index:50; background:#f0f0f0; border:1px solid #ccc; border-left:none; border-radius:0 4px 4px 0; padding:8px 4px; cursor:pointer; font-size:10px; writing-mode:vertical-rl; }
+  .sidebar-toggle:hover { background:#e0e0e0; }
+  .sidebar { position:fixed; left:0; top:0; bottom:0; width:220px; background:#fff; border-right:1px solid #ccc; z-index:50; transform:translateX(-220px); transition:transform 0.2s; overflow-y:auto; padding:8px; font-size:11px; }
+  .sidebar.open { transform:translateX(0); }
+  .sidebar h4 { margin:0 0 6px; font-size:12px; }
+  .sidebar .upload-area { border:2px dashed #ccc; border-radius:4px; padding:12px; text-align:center; color:#999; cursor:pointer; margin-bottom:8px; font-size:11px; }
+  .sidebar .upload-area:hover { border-color:#999; color:#666; }
+  .sidebar .upload-area input { display:none; }
+  .sidebar .file-list { list-style:none; padding:0; margin:0; }
+  .sidebar .file-item { padding:4px 6px; border:1px solid #eee; border-radius:3px; margin-bottom:4px; cursor:pointer; display:flex; flex-direction:column; gap:2px; }
+  .sidebar .file-item:hover { background:#f0f5ff; border-color:#aac; }
+  .sidebar .file-item.active { background:#e8f0ff; border-color:#68a; }
+  .sidebar .file-item .fname { font-weight:bold; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sidebar .file-item .finfo { font-size:9px; color:#888; }
+  .sidebar .file-item svg { display:block; width:100%; height:60px; border:1px solid #eee; border-radius:2px; background:#fafafa; margin-top:2px; }
+  .sidebar .close-btn { position:absolute; top:4px; right:6px; cursor:pointer; font-size:14px; color:#999; }
+  .sidebar .close-btn:hover { color:#333; }
+  body.sidebar-open { margin-left:228px; }
+  .production-board { position:fixed; right:0; top:0; bottom:0; width:320px; background:#fff; border-left:1px solid #bbb; z-index:45; transform:translateX(320px); transition:transform 0.2s; display:flex; flex-direction:column; font-size:11px; }
+  .production-board.open { transform:translateX(0); }
+  body.production-open { margin-right:328px; }
+  .production-head { display:flex; align-items:flex-start; gap:8px; justify-content:space-between; padding:8px 10px; background:#f6f6f6; border-bottom:1px solid #ccc; }
+  .production-head h3 { margin:0; font-size:14px; }
+  .production-actions { display:flex; gap:6px; align-items:center; flex-wrap:wrap; }
+  .production-actions button { font-size:11px; padding:3px 8px; border:1px solid #aaa; border-radius:3px; background:#fff; cursor:pointer; }
+  .production-actions button:hover { background:#eee; }
+  .production-actions button.active { background:#333; color:#fff; border-color:#333; }
+  .production-summary { font-size:11px; color:#555; font-family:monospace; }
+  .sub-grid { padding:8px; display:flex; flex-direction:column; gap:7px; overflow:auto; flex:1; }
+  .sub-card { border:1px solid #ccc; border-radius:4px; background:#fff; padding:5px 6px; display:grid; grid-template-columns:22px 42px minmax(0,1fr); gap:6px; cursor:pointer; align-items:center; }
+  .sub-card:hover { border-color:#777; background:#fbfdff; }
+  .sub-card.built { background:#eee; border-color:#bbb; color:#777; opacity:0.72; }
+  .sub-card.active { outline:2px solid #4477aa; outline-offset:-2px; }
+  .sub-card.issue { background:#fff6ed; border-color:#d7a76b; }
+  .sub-card input[type=checkbox] { width:17px; height:17px; margin-top:1px; cursor:pointer; }
+  .sub-card h4 { margin:0; font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sub-card .meta { font-size:10px; color:#666; display:flex; gap:5px; flex-wrap:wrap; margin-top:1px; align-items:center; }
+  .sub-card .notes { font-size:10px; color:#555; margin-top:2px; min-height:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sub-card svg { display:block; width:40px; height:32px; border:1px solid #eee; background:#fafafa; border-radius:2px; }
+  .status-pill { display:inline-block; padding:1px 5px; border:1px solid #bbb; border-radius:10px; background:#f5f5f5; font-size:9px; text-transform:uppercase; }
+  .built .status-pill { border-color:#aaa; background:#ddd; color:#555; }
+  .issue .status-pill { border-color:#c89151; background:#fff1df; color:#7a4b14; }
+  .production-side { border-top:1px solid #ccc; background:#fafafa; padding:8px; max-height:210px; overflow:auto; }
+  .production-side h4 { margin:0 0 6px; font-size:12px; }
+  .production-side textarea { width:100%; min-height:72px; resize:vertical; font-size:10px; font-family:monospace; box-sizing:border-box; border:1px solid #bbb; border-radius:3px; padding:6px; }
+  .build-log { list-style:none; margin:8px 0 0; padding:0; font-size:10px; }
+  .build-log li { padding:5px 0; border-bottom:1px solid #e4e4e4; }
+  .build-log .time { color:#777; font-family:monospace; display:block; }
+  .empty-board { padding:30px; color:#777; font-size:13px; }
+  .current-build { display:none; align-items:center; gap:8px; margin-bottom:6px; padding:7px 9px; background:#eef5ff; border:1px solid #b8cde8; border-radius:4px; font-size:12px; }
+  .current-build.open { display:flex; }
+  .current-build input { width:18px; height:18px; }
+  .current-build strong { display:block; }
+  .current-build span { color:#555; font-size:10px; }
+  #v1bar { display:flex; gap:6px; align-items:center; margin-bottom:6px; padding:6px 10px; background:#eef5ff; border:1px solid #b8cde8; border-radius:4px; font-size:12px; }
+  #v1bar strong { font-size:12px; }
+  #v1bar input { font-family:monospace; font-size:11px; padding:3px 6px; border:1px solid #aac; border-radius:3px; }
+  #v1bar button { font-size:11px; padding:3px 10px; border:1px solid #68a; border-radius:3px; background:#fff; cursor:pointer; }
+</style>
+<script src="qr-codec.js"></script>
+</head>
+<body>
+
+<div class="sidebar-toggle" id="sidebarToggle">📁 Files</div>
+<div class="sidebar" id="sidebar">
+  <span class="close-btn" id="sidebarClose">✕</span>
+  <h4>CDT Files</h4>
+  <div class="upload-area" id="uploadArea">
+    <div>Drop .cdt files or click to upload</div>
+    <input type="file" id="fileInput" multiple accept=".cdt" webkitdirectory>
+  </div>
+  <ul class="file-list" id="fileList"></ul>
+</div>
+
+<div class="toolbar">
+  <label><input type="checkbox" id="chkFront" checked> Front</label>
+  <label><input type="checkbox" id="chkBackView"> Back view</label>
+  <label><input type="checkbox" id="chkTop" checked> Top</label>
+  <label><input type="checkbox" id="chkSide" checked> Side</label>
+  <div class="sep"></div>
+  <label><input type="checkbox" id="chkDims" checked> Dims</label>
+  <label><input type="checkbox" id="chkStudDims" checked> Stud chain</label>
+  <label><input type="checkbox" id="chkOpenDims" checked> Opening dims</label>
+  <label><input type="checkbox" id="chkSpecs"> Specs</label>
+  <label><input type="checkbox" id="chkRouting" checked> Routing</label>
+  <label><input type="checkbox" id="chkNails"> Nails</label>
+  <label><input type="checkbox" id="chkSheets"> Sheets</label>
+  <label><input type="checkbox" id="chkOriginDims"> Origin dims</label>
+  <label><input type="checkbox" id="chkCutList" checked> Cut list</label>
+  <div class="sep"></div>
+  <button id="btnMeasure">Measure</button>
+  <button id="btnClear">Clear</button>
+  <button id="btnZoomReset">Reset zoom</button>
+  <span class="mstat" id="mStatus"></span>
+  <div class="sep"></div>
+  <button id="btnProduction">Production Board</button>
+  <button id="btnImportList">Import List CSV</button>
+  <input type="file" id="productionInput" accept=".csv,.txt" style="display:none">
+  <span class="production-hint" id="productionHint">No production list loaded</span>
+  <div class="sep"></div>
+  <button id="btnSettings">⚙ Settings</button>
+</div>
+<div id="v1bar">
+  <strong id="v1sub">—</strong>
+  <span style="flex:1"></span>
+  <input id="v1input" placeholder="Paste V1 code (V1*S:...)" style="flex:2;min-width:180px;">
+  <button id="v1load">Render code</button>
+</div>
+<div class="tabs" id="tabs"></div>
+<div class="current-build" id="currentBuild"><input type="checkbox" id="currentBuildCheck"><div><strong id="currentBuildTitle"></strong><span id="currentBuildMeta"></span></div></div>
+<div class="main-area"><svg id="svg"></svg><div class="cutlist" id="cutlist"></div></div>
+<div class="production-board" id="productionBoard">
+  <div class="production-head">
+    <div>
+      <h3>Production Sub Board</h3>
+      <div class="production-summary" id="productionSummary"></div>
+    </div>
+    <div class="production-actions">
+      <button id="btnExportRemaining">Export Remaining CSV</button>
+      <button id="btnExportLog">Export Built Log CSV</button>
+      <button id="btnHideBuilt">Hide Built</button>
+      <button id="btnClearBuilt">Clear Ticks</button>
+    </div>
+  </div>
+  <div class="sub-grid" id="subGrid"></div>
+  <aside class="production-side">
+    <h4>Production List Format</h4>
+    <textarea readonly>order,panel,sub,qty,station,notes
+1,S-1-B-W05.cdt,1,1,Sub bench,Window sub first
+2,S-1-B-W05.cdt,2,1,Sub bench,
+3,S-1-B-W06.cdt,all,1,Sub bench,</textarea>
+    <h4 style="margin-top:12px;">Built Log</h4>
+    <ul class="build-log" id="buildLog"></ul>
+  </aside>
+</div>
+
+<!-- Settings -->
+<div class="settings-overlay" id="settingsOverlay">
+<div class="settings-panel">
+  <h3>⚙ Display Settings</h3>
+
+  <div class="section">Element Colours</div>
+  <div class="row"><label>Stud</label><input type="color" id="cStud" value="#c8a26e"><span class="val"></span></div>
+  <div class="row"><label>Plate</label><input type="color" id="cPlate" value="#a07840"><span class="val"></span></div>
+  <div class="row"><label>Header</label><input type="color" id="cHeader" value="#d4a44a"><span class="val"></span></div>
+  <div class="row"><label>Sill</label><input type="color" id="cSill" value="#bfa060"><span class="val"></span></div>
+  <div class="row"><label>Sheet</label><input type="color" id="cSheet" value="#7a9a6a"><span class="val"></span></div>
+  <div class="row"><label>Opening</label><input type="color" id="cOpening" value="#cc3333"><span class="val"></span></div>
+
+  <div class="section">Sub Assembly Colours</div>
+  <div class="row"><label>Colour subs</label><input type="checkbox" id="chkSubColour"></div>
+  <div class="row"><label>Sub 1</label><input type="color" id="cSub0" value="#2266aa"><span class="val"></span></div>
+  <div class="row"><label>Sub 2</label><input type="color" id="cSub1" value="#aa6622"><span class="val"></span></div>
+  <div class="row"><label>Sub 3</label><input type="color" id="cSub2" value="#22aa66"><span class="val"></span></div>
+  <div class="row"><label>Sub 4</label><input type="color" id="cSub3" value="#aa2266"><span class="val"></span></div>
+
+  <div class="section">Dimensions</div>
+  <div class="row"><label>Dim colour</label><input type="color" id="cDim" value="#0066cc"><span class="val"></span></div>
+  <div class="row"><label>Dim font size</label><input type="range" id="rDimFont" min="6" max="16" value="9"><span class="val" id="vDimFont">9px</span></div>
+  <div class="row"><label>Dim tick length</label><input type="range" id="rDimTick" min="2" max="10" value="3"><span class="val" id="vDimTick">3</span></div>
+  <div class="row"><label>Dim line weight</label><input type="range" id="rDimLine" min="1" max="10" value="5"><span class="val" id="vDimLine">0.5</span></div>
+  <div class="row"><label>Ext. line style</label><select id="sDimExt"><option value="2,2">Dashed</option><option value="none">Solid</option><option value="1,2">Dotted</option></select></div>
+  <div class="row"><label>Chain offset 1</label><input type="number" id="nChainOff1" value="16" min="4" max="60"><span class="val">px</span></div>
+  <div class="row"><label>Chain offset 2</label><input type="number" id="nChainOff2" value="28" min="4" max="60"><span class="val">px</span></div>
+  <div class="row"><label>Overall offset</label><input type="number" id="nOverallOff" value="42" min="10" max="80"><span class="val">px</span></div>
+  <div class="row"><label>Measure colour</label><input type="color" id="cMeasure" value="#dd4444"><span class="val"></span></div>
+
+  <div class="section">Spec Label Controls</div>
+  <div class="sub-section">Header label</div>
+  <div class="row"><label>Font size</label><input type="range" id="rHdrFont" min="6" max="16" value="8"><span class="val" id="vHdrFont">8px</span></div>
+  <div class="row"><label>Orientation</label><select id="sHdrOrient"><option value="0">Horizontal</option><option value="-90">Vertical ↑</option><option value="90">Vertical ↓</option></select></div>
+  <div class="row"><label>Placement</label><select id="sHdrPlace"><option value="centre">Centre of element</option><option value="above">Above element</option><option value="below">Below element</option><option value="left">Left of element</option><option value="right">Right of element</option></select></div>
+  <div class="row"><label>Offset (px)</label><input type="number" id="nHdrOff" value="0" min="-40" max="40"><span class="val">px</span></div>
+
+  <div class="sub-section">Sill label</div>
+  <div class="row"><label>Font size</label><input type="range" id="rSillFont" min="6" max="16" value="8"><span class="val" id="vSillFont">8px</span></div>
+  <div class="row"><label>Orientation</label><select id="sSillOrient"><option value="0">Horizontal</option><option value="-90">Vertical ↑</option><option value="90">Vertical ↓</option></select></div>
+  <div class="row"><label>Placement</label><select id="sSillPlace"><option value="centre">Centre of element</option><option value="above">Above element</option><option value="below">Below element</option><option value="left">Left of element</option><option value="right">Right of element</option></select></div>
+  <div class="row"><label>Offset (px)</label><input type="number" id="nSillOff" value="0" min="-40" max="40"><span class="val">px</span></div>
+
+  <div class="sub-section">Jack Over label</div>
+  <div class="row"><label>Font size</label><input type="range" id="rOverFont" min="6" max="16" value="8"><span class="val" id="vOverFont">8px</span></div>
+  <div class="row"><label>Orientation</label><select id="sOverOrient"><option value="-90" selected>Vertical ↑</option><option value="0">Horizontal</option><option value="90">Vertical ↓</option></select></div>
+  <div class="row"><label>Placement</label><select id="sOverPlace"><option value="centre" selected>Centre of element</option><option value="above">Above element</option><option value="below">Below element</option><option value="left">Left of element</option><option value="right">Right of element</option></select></div>
+  <div class="row"><label>Offset (px)</label><input type="number" id="nOverOff" value="0" min="-40" max="40"><span class="val">px</span></div>
+
+  <div class="sub-section">Jack Under label</div>
+  <div class="row"><label>Font size</label><input type="range" id="rUnderFont" min="6" max="16" value="8"><span class="val" id="vUnderFont">8px</span></div>
+  <div class="row"><label>Orientation</label><select id="sUnderOrient"><option value="-90" selected>Vertical ↑</option><option value="0">Horizontal</option><option value="90">Vertical ↓</option></select></div>
+  <div class="row"><label>Placement</label><select id="sUnderPlace"><option value="centre" selected>Centre of element</option><option value="above">Above element</option><option value="below">Below element</option><option value="left">Left of element</option><option value="right">Right of element</option></select></div>
+  <div class="row"><label>Offset (px)</label><input type="number" id="nUnderOff" value="0" min="-40" max="40"><span class="val">px</span></div>
+
+  <div class="section">Scale</div>
+  <div class="row"><label>Drawing scale</label><input type="range" id="rScale" min="5" max="25" value="12"><span class="val" id="vScale">0.12</span></div>
+
+  <div style="display:flex;gap:8px;margin-top:10px;">
+    <button id="btnSettingsClose">Close & Apply</button>
+    <button id="btnSettingsReset">Reset defaults</button>
+  </div>
+</div>
+</div>
+
+<script>
+const NS="http://www.w3.org/2000/svg";
+function mkEl(tag,attrs={},parent){const el=document.createElementNS(NS,tag);for(const k in attrs)el.setAttribute(k,attrs[k]);if(parent)parent.appendChild(el);return el;}
+
+const RAW=`ELM:3157:2753:140:1:3157:2753:140
+BS:3157:45:140:0:0:0:SFBottomPlate:L=3157:WxH=45x140:q
+TS:3157:45:140:0:2708:0:SFTopPlate:L=3157:WxH=45x140:q
+ST:45:2663:140:1581.5:45:0:Stud:L=2663:WxH=45x140:q
+ST:45:2663:140:1982.5:45:0:Stud:L=2663:WxH=45x140:q
+ST:45:2663:140:2783.5:45:0:Stud:L=2663:WxH=45x140:q
+ST:45:2663:140:3112:45:0:SFStudRight:L=2663:WxH=45x140:q
+SUB:225:2663:140:2339:45:0:1c3c520b-c22d-4501-99cb-f14dea9d07b3
+ST:45:2663:140:2339:45:0:Stud:L=2663:WxH=45x140:q
+ST:90:2663:45:2384:45:95:Stud:L=2663:WxH=45x90:q
+ST:45:2663:140:2474:45:0:Stud:L=2663:WxH=45x140:q
+ST:45:2663:140:2519:45:0:Stud:L=2663:WxH=45x140:q
+SUE
+SUB:1474:2663:140:0:45:0:a5455026-d145-4727-8b5d-1cab317b768c
+ST:45:2663:140:0:45:0:SFStudLeft:L=2663:WxH=45x140:q
+ST:45:2663:140:45:45:0:KingStud:L=2663:WxH=45x140:q
+STL:1249:140:45:90:2121:50:Header:L=1249:WxH=45x140:q
+STL:1249:140:45:90:2121:95:Header:L=1249:WxH=45x140:q
+STL:1249:140:45:90:2121:5:Header:L=1249:WxH=45x140:q
+ST:45:447:140:90:2261:0:SFJackOverOpening:L=447:WxH=45x140:q
+STL:1249:45:140:90:1021:0:Sill:L=1249:WxH=45x140:q
+ST:45:447:140:354.5:2261:0:SFJackOverOpening:L=447:WxH=45x140:q
+ST:45:976:140:354.5:45:0:SFJackUnderOpening:L=976:WxH=45x140:q
+ST:45:976:140:755.5:45:0:SFJackUnderOpening:L=976:WxH=45x140:q
+ST:45:447:140:755.5:2261:0:SFJackOverOpening:L=447:WxH=45x140:q
+ST:45:447:140:1180.5:2261:0:SFJackOverOpening:L=447:WxH=45x140:q
+ST:45:976:140:1180.5:45:0:SFJackUnderOpening:L=976:WxH=45x140:q
+ST:45:447:140:1294:2261:0:SFJackOverOpening:L=447:WxH=45x140:q
+ST:45:2663:140:1339:45:0:KingStud:L=2663:WxH=45x140:q
+ST:45:2663:140:1384:45:0:KingStud:L=2663:WxH=45x140:q
+ST:45:2663:140:1429:45:0:KingStud:L=2663:WxH=45x140:q
+SUE
+BOI1:1200:2735:9:2:9:140:11:M.B - STRUCTApanel
+BOI1:1200:2735:9:1204:9:140:11:M.B - STRUCTApanel
+BOI1:749:2735:9:2406:9:140:11:M.B - STRUCTApanel
+BOI2:1200:2711:13:2:22:149:30:M.B - Plasterboard
+BOI2:1200:2711:13:1204:22:149:30:M.B - Plasterboard
+BOI2:749:2711:13:2406:22:149:30:M.B - Plasterboard
+ROB:1474:45:149:2
+RL:1474:2134:139:0
+RL:2339:2134:139:0
+RL:2339:45:139:0
+RL:1474:45:139:0
+ROE
+ROB:1341:2134:149:2
+RL:1341:1074:139:0
+RL:88:1074:139:0
+RL:88:2133:139:0
+RL:1341:2133:139:0
+ROE
+FST:22:0:25:22:70:25:0:Standard Nail
+FST:22:0:55:22:70:55:0:Standard Nail
+FST:22:2753:25:22:2683:25:0:Standard Nail
+FST:67:0:25:67:70:25:0:Standard Nail
+FST:67:2753:55:67:2683:55:0:Standard Nail
+FST:377:0:85:377:70:85:0:Standard Nail
+FST:778:0:25:778:70:25:0:Standard Nail
+FST:1361:0:55:1361:70:55:0:Standard Nail
+FST:1451:0:25:1451:70:25:0:Standard Nail
+FST:2361:0:25:2361:70:25:0:Standard Nail
+FST:2496:0:25:2496:70:25:0:Standard Nail
+FST:2806:2753:25:2806:2683:25:0:Standard Nail
+FST:3134:0:55:3134:70:55:0:Standard Nail
+INK:1578.5:2753:0:S-1-B-W05
+INK:1578.5:0:0:S-1-B-W05`;
+const SAMPLE_CDTS=[{"name":"A2-B_1_ST_MB-W-01.cdt","raw":"COPYRIGHT: Randek AB. This document/file is protected by copyright proprietary to Randek AB and may only be used for the intended purpose. This document/file may not be copied, used, distributed or similar, without the prior written approval of Randek AB.;\r\n\r\nVERSION:5.0.15;\r\nTXT:====================================================;\r\nTXT:Executable;\r\nTXT:Hsb-Version;\r\nTXT:Randek-Version;\r\nTXT:Zones;\r\nTXT:FrameNailing;\r\nTXT:Rotation;\r\nTXT:Flip;\r\nTXT:Breather Paper;\r\nTXT:Branders;\r\nTXT:Insulation;\r\nTXT:Tape Nailing;\r\nTXT:Glue lines;\r\nTXT:Ink lines;\r\nTXT:Internal Wall Types;\r\nTXT:External Wall Types;\r\nTXT:Modular Wall Types;\r\nTXT:Nail Specifications;\r\nTXT:Sheet Indexes;\r\nTXT:Exclude Datum X Tags;\r\nTXT:Exclude Datum Y Tags;\r\nTXT:Exclude Datum Z Tags;\r\nTXT:Resequence sheets;\r\nTXT:====================================================;\r\nTXT:FRAMING_STATION;\r\nTXT:PANEL_IDENTIFICATION_TOPRAIL;\r\nTXT:PANEL_IDENTIFICATION_BOTTOMRAIL;\r\nTXT:NAILING_BOARD_OUTSIDE;\r\nPNO:pno;\r\nFL:0;\r\nSEQUENCENUMBER:0;\r\nMASS:0;\r\nELD:EXTERIOR;\r\nDNO:A2-B.1.ST_MB-W-01;\r\nELF:INSIDE;\r\nELM:3369.5:2802:140:1:3369:2802:140;\r\n\r\n\r\nTS:3369.5:45:140:0:2757:0:SFTopPlate:L=3369:WxH=45x140:q;\r\nBS:3369.5:45:140:0:0:0:SFBottomPlate:L=3369:WxH=45x140:q;\r\n\r\nST:45:2712:90:280:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:580.5:45:50:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:880:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:1180.5:45:50:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:1481:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:1781.5:45:50:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:2082:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:2382.5:45:50:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:2784.5:45:50:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:140:2829.5:45:0:Stud:L=2712:WxH=45x140:q;\r\nST:45:2712:90:2982.5:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:140:3189.5:45:0:Stud:L=2712:WxH=45x140:q;\r\n\r\nSUB:135:2712:140:0:45:0:81f84f48-a608-4b7d-b5d9-bb9122eebe50;\r\nST:45:2712:140:0:45:0:SFStudLeft:L=2712:WxH=45x140:q;\r\nST:45:155:140:45:2602:0:SFStudLeft:L=155:WxH=45x140:q;\r\nST:45:2307:140:45:45:0:SFStudLeft:L=2307:WxH=45x140:q;\r\nST:45:2712:140:90:45:0:SFStudLeft:L=2712:WxH=45x140:q;\r\nSUE;\r\nSUB:135:2712:140:3234.5:45:0:876593d7-c03a-46ac-9af4-2ca50967ae92;\r\nST:45:2712:140:3234.5:45:0:SFStudLeft:L=2712:WxH=45x140:q;\r\nST:45:155:140:3279.5:2602:0:SFStudLeft:L=155:WxH=45x140:q;\r\nST:45:2307:140:3279.5:45:0:SFStudLeft:L=2307:WxH=45x140:q;\r\nST:45:2712:140:3324.5:45:0:SFStudLeft:L=2712:WxH=45x140:q;\r\nSUE;\r\n\r\nBOI1:1200:3050:9:1204:9:140:11:M.B - STRUCTApanel;\r\nBOI1:1200:3050:9:2406:9:140:11:M.B - STRUCTApanel;\r\n\r\nBOI2:599:2784:13:1204:9:149:32:M.B - Fyrchek Plaste;\r\nBOI2:1200:2784:13:1805:9:149:32:M.B - Fyrchek Plaste;\r\n\r\nBOI3:1200:2784:13:1204:9:162:32:M.B - Fyrchek Plaste;\r\nBOI3:1200:2784:13:2406:9:162:32:M.B - Fyrchek Plaste;\r\n\r\n\r\n\r\nNL:1214.7:123:149:1214.7:2723:149:100:12;\r\nNL:1254:27:149:2354:27:149:100:12;\r\nNL:1254:2775:149:2354:2775:149:100:12;\r\nNL:1804:123:149:1804:2723:149:200:12;\r\nNL:2393.3:123:149:2393.3:2723:149:100:12;\r\nNL:2416.7:123:149:2416.7:2723:149:100:12;\r\nNL:2430.2:27:149:2830.2:27:149:100:12;\r\nNL:2436.8:2775:149:3336.8:2775:149:100:12;\r\nNL:2705.5:123:149:2705.5:2723:149:100:12;\r\nNL:2842:123:149:2842:2723:149:100:12;\r\nNL:3257:123:149:3257:2723:149:100:12;\r\nNL:3346:123:149:3346:2723:149:100:12;\r\n\r\nNL:23.5:99:162:23.5:2703:162:2604:15;\r\nNL:590.8:99:162:590.8:2703:162:2604:15;\r\nNL:614.2:99:162:614.2:2703:162:2604:15;\r\nNL:1214.3:99:162:1214.3:2703:162:2604:15;\r\nNL:1214.3:303:162:1214.3:2103:162:600:15;\r\nNL:1792.2:99:162:1792.2:2703:162:2604:15;\r\nNL:1792.2:303:162:1792.2:2103:162:600:15;\r\nNL:1815.8:99:162:1815.8:2703:162:2604:15;\r\nNL:1815.8:303:162:1815.8:2103:162:600:15;\r\nNL:2405:99:162:2405:2703:162:2604:15;\r\nNL:2405:303:162:2405:2103:162:600:15;\r\nNL:2842:99:162:2842:2703:162:2604:15;\r\nNL:2842:303:162:2842:2103:162:600:15;\r\nNL:2994.2:99:162:2994.2:2703:162:2604:15;\r\nNL:2994.2:303:162:2994.2:2103:162:600:15;\r\nNL:3017.8:99:162:3017.8:2703:162:2604:15;\r\nNL:3017.8:303:162:3017.8:2103:162:600:15;\r\nNL:3212:99:162:3212:2703:162:2604:15;\r\nNL:3212:303:162:3212:2103:162:600:15;\r\n\r\nNL:1214.7:59:175:1214.7:2743:175:2684:15;\r\nNL:1214.7:193:175:1214.7:2593:175:150:15;\r\nNL:1804:59:175:1804:2743:175:2684:15;\r\nNL:1804:193:175:1804:2593:175:150:15;\r\nNL:2393.3:59:175:2393.3:2743:175:2684:15;\r\nNL:2393.3:193:175:2393.3:2593:175:150:15;\r\nNL:2416.7:59:175:2416.7:2743:175:2684:15;\r\nNL:2416.7:193:175:2416.7:2593:175:150:15;\r\nNL:2842:59:175:2842:2743:175:2684:15;\r\nNL:2842:193:175:2842:2593:175:150:15;\r\nNL:3212:59:175:3212:2743:175:2684:15;\r\nNL:3212:193:175:3212:2593:175:150:15;\r\n\r\n\r\nROB:3367.5:9:149:1;\r\nRL:3367.5:3059:140:0;\r\nRL:3606:3059:140:0;\r\nRL:3606:9:140:0;\r\nRL:3367.5:9:140:0;\r\nROE;\r\nROB:3242:9:175:1;\r\nRL:3242:2793:162:0;\r\nRL:3606:2793:162:0;\r\nRL:3606:9:162:0;\r\nRL:3242:9:162:0;\r\nROE;\r\nROB:3367.5:2793:149:2;\r\nRL:1204:2793:140:0;\r\nROE;\r\n\r\nINK:1684.7:2802:0:MB-W-01;\r\n\r\nINK:1684.7:0:0:MB-W-01;\r\n\r\nFST:22:0:25:22:70:25:0:Standard Nail;\r\nFST:22:0:55:22:70:55:0:Standard Nail;\r\nFST:22:0:85:22:70:85:0:Standard Nail;\r\nFST:22:0:115:22:70:115:0:Standard Nail;\r\nFST:22:2802:25:22:2732:25:0:Standard Nail;\r\nFST:22:2802:55:22:2732:55:0:Standard Nail;\r\nFST:22:2802:85:22:2732:85:0:Standard Nail;\r\nFST:22:2802:115:22:2732:115:0:Standard Nail;\r\nFST:67:0:25:67:70:25:0:Standard Nail;\r\nFST:67:0:55:67:70:55:0:Standard Nail;\r\nFST:67:0:85:67:70:85:0:Standard Nail;\r\nFST:67:0:115:67:70:115:0:Standard Nail;\r\nFST:67:2802:25:67:2732:25:0:Standard Nail;\r\nFST:67:2802:55:67:2732:55:0:Standard Nail;\r\nFST:67:2802:85:67:2732:85:0:Standard Nail;\r\nFST:67:2802:115:67:2732:115:0:Standard Nail;\r\nFST:112:0:25:112:70:25:0:Standard Nail;\r\nFST:112:0:55:112:70:55:0:Standard Nail;\r\nFST:112:0:85:112:70:85:0:Standard Nail;\r\nFST:112:0:115:112:70:115:0:Standard Nail;\r\nFST:112:2802:25:112:2732:25:0:Standard Nail;\r\nFST:112:2802:55:112:2732:55:0:Standard Nail;\r\nFST:112:2802:85:112:2732:85:0:Standard Nail;\r\nFST:112:2802:115:112:2732:115:0:Standard Nail;\r\nFST:302:0:20:302:70:20:0:Standard Nail;\r\nFST:302:0:45:302:70:45:0:Standard Nail;\r\nFST:302:0:70:302:70:70:0:Standard Nail;\r\nFST:302:2802:20:302:2732:20:0:Standard Nail;\r\nFST:302:2802:45:302:2732:45:0:Standard Nail;\r\nFST:302:2802:70:302:2732:70:0:Standard Nail;\r\nFST:602.5:0:70:602.5:70:70:0:Standard Nail;\r\nFST:602.5:0:95:602.5:70:95:0:Standard Nail;\r\nFST:602.5:0:120:602.5:70:120:0:Standard Nail;\r\nFST:602.5:2802:70:602.5:2732:70:0:Standard Nail;\r\nFST:602.5:2802:95:602.5:2732:95:0:Standard Nail;\r\nFST:602.5:2802:120:602.5:2732:120:0:Standard Nail;\r\nFST:902:0:20:902:70:20:0:Standard Nail;\r\nFST:902:0:45:902:70:45:0:Standard Nail;\r\nFST:902:0:70:902:70:70:0:Standard Nail;\r\nFST:902:2802:20:902:2732:20:0:Standard Nail;\r\nFST:902:2802:45:902:2732:45:0:Standard Nail;\r\nFST:902:2802:70:902:2732:70:0:Standard Nail;\r\nFST:1202.5:0:70:1202.5:70:70:0:Standard Nail;\r\nFST:1202.5:0:95:1202.5:70:95:0:Standard Nail;\r\nFST:1202.5:0:120:1202.5:70:120:0:Standard Nail;\r\nFST:1202.5:2802:70:1202.5:2732:70:0:Standard Nail;\r\nFST:1202.5:2802:95:1202.5:2732:95:0:Standard Nail;\r\nFST:1202.5:2802:120:1202.5:2732:120:0:Standard Nail;\r\nFST:1503:0:20:1503:70:20:0:Standard Nail;\r\nFST:1503:0:45:1503:70:45:0:Standard Nail;\r\nFST:1503:0:70:1503:70:70:0:Standard Nail;\r\nFST:1503:2802:20:1503:2732:20:0:Standard Nail;\r\nFST:1503:2802:45:1503:2732:45:0:Standard Nail;\r\nFST:1503:2802:70:1503:2732:70:0:Standard Nail;\r\nFST:1803.5:0:70:1803.5:70:70:0:Standard Nail;\r\nFST:1803.5:0:95:1803.5:70:95:0:Standard Nail;\r\nFST:1803.5:0:120:1803.5:70:120:0:Standard Nail;\r\nFST:1803.5:2802:70:1803.5:2732:70:0:Standard Nail;\r\nFST:1803.5:2802:95:1803.5:2732:95:0:Standard Nail;\r\nFST:1803.5:2802:120:1803.5:2732:120:0:Standard Nail;\r\nFST:2104:0:20:2104:70:20:0:Standard Nail;\r\nFST:2104:0:45:2104:70:45:0:Standard Nail;\r\nFST:2104:0:70:2104:70:70:0:Standard Nail;\r\nFST:2104:2802:20:2104:2732:20:0:Standard Nail;\r\nFST:2104:2802:45:2104:2732:45:0:Standard Nail;\r\nFST:2104:2802:70:2104:2732:70:0:Standard Nail;\r\nFST:2404.5:0:70:2404.5:70:70:0:Standard Nail;\r\nFST:2404.5:0:95:2404.5:70:95:0:Standard Nail;\r\nFST:2404.5:0:120:2404.5:70:120:0:Standard Nail;\r\nFST:2404.5:2802:70:2404.5:2732:70:0:Standard Nail;\r\nFST:2404.5:2802:95:2404.5:2732:95:0:Standard Nail;\r\nFST:2404.5:2802:120:2404.5:2732:120:0:Standard Nail;\r\nFST:2806.5:0:70:2806.5:70:70:0:Standard Nail;\r\nFST:2806.5:0:95:2806.5:70:95:0:Standard Nail;\r\nFST:2806.5:0:120:2806.5:70:120:0:Standard Nail;\r\nFST:2806.5:2802:70:2806.5:2732:70:0:Standard Nail;\r\nFST:2806.5:2802:95:2806.5:2732:95:0:Standard Nail;\r\nFST:2806.5:2802:120:2806.5:2732:120:0:Standard Nail;\r\nFST:2851.5:0:25:2851.5:70:25:0:Standard Nail;\r\nFST:2851.5:0:55:2851.5:70:55:0:Standard Nail;\r\nFST:2851.5:0:85:2851.5:70:85:0:Standard Nail;\r\nFST:2851.5:0:115:2851.5:70:115:0:Standard Nail;\r\nFST:2851.5:2802:25:2851.5:2732:25:0:Standard Nail;\r\nFST:2851.5:2802:55:2851.5:2732:55:0:Standard Nail;\r\nFST:2851.5:2802:85:2851.5:2732:85:0:Standard Nail;\r\nFST:2851.5:2802:115:2851.5:2732:115:0:Standard Nail;\r\nFST:3004.5:0:20:3004.5:70:20:0:Standard Nail;\r\nFST:3004.5:0:45:3004.5:70:45:0:Standard Nail;\r\nFST:3004.5:0:70:3004.5:70:70:0:Standard Nail;\r\nFST:3004.5:2802:20:3004.5:2732:20:0:Standard Nail;\r\nFST:3004.5:2802:45:3004.5:2732:45:0:Standard Nail;\r\nFST:3004.5:2802:70:3004.5:2732:70:0:Standard Nail;\r\nFST:3211.5:0:25:3211.5:70:25:0:Standard Nail;\r\nFST:3211.5:0:55:3211.5:70:55:0:Standard Nail;\r\nFST:3211.5:0:85:3211.5:70:85:0:Standard Nail;\r\nFST:3211.5:0:115:3211.5:70:115:0:Standard Nail;\r\nFST:3211.5:2802:25:3211.5:2732:25:0:Standard Nail;\r\nFST:3211.5:2802:55:3211.5:2732:55:0:Standard Nail;\r\nFST:3211.5:2802:85:3211.5:2732:85:0:Standard Nail;\r\nFST:3211.5:2802:115:3211.5:2732:115:0:Standard Nail;\r\nFST:3256.5:0:25:3256.5:70:25:0:Standard Nail;\r\nFST:3256.5:0:55:3256.5:70:55:0:Standard Nail;\r\nFST:3256.5:0:85:3256.5:70:85:0:Standard Nail;\r\nFST:3256.5:0:115:3256.5:70:115:0:Standard Nail;\r\nFST:3256.5:2802:25:3256.5:2732:25:0:Standard Nail;\r\nFST:3256.5:2802:55:3256.5:2732:55:0:Standard Nail;\r\nFST:3256.5:2802:85:3256.5:2732:85:0:Standard Nail;\r\nFST:3256.5:2802:115:3256.5:2732:115:0:Standard Nail;\r\nFST:3301.5:0:25:3301.5:70:25:0:Standard Nail;\r\nFST:3301.5:0:55:3301.5:70:55:0:Standard Nail;\r\nFST:3301.5:0:85:3301.5:70:85:0:Standard Nail;\r\nFST:3301.5:0:115:3301.5:70:115:0:Standard Nail;\r\nFST:3301.5:2802:25:3301.5:2732:25:0:Standard Nail;\r\nFST:3301.5:2802:55:3301.5:2732:55:0:Standard Nail;\r\nFST:3301.5:2802:85:3301.5:2732:85:0:Standard Nail;\r\nFST:3301.5:2802:115:3301.5:2732:115:0:Standard Nail;\r\nFST:3346.5:0:25:3346.5:70:25:0:Standard Nail;\r\nFST:3346.5:0:55:3346.5:70:55:0:Standard Nail;\r\nFST:3346.5:0:85:3346.5:70:85:0:Standard Nail;\r\nFST:3346.5:0:115:3346.5:70:115:0:Standard Nail;\r\nFST:3346.5:2802:25:3346.5:2732:25:0:Standard Nail;\r\nFST:3346.5:2802:55:3346.5:2732:55:0:Standard Nail;\r\nFST:3346.5:2802:85:3346.5:2732:85:0:Standard Nail;\r\nFST:3346.5:2802:115:3346.5:2732:115:0:Standard Nail;\r\n\r\n\r\nEOF;\r\n"},{"name":"A2-B_1_ST_MB-W-02.cdt","raw":"COPYRIGHT: Randek AB. This document/file is protected by copyright proprietary to Randek AB and may only be used for the intended purpose. This document/file may not be copied, used, distributed or similar, without the prior written approval of Randek AB.;\r\n\r\nVERSION:5.0.15;\r\nTXT:====================================================;\r\nTXT:Executable;\r\nTXT:Hsb-Version;\r\nTXT:Randek-Version;\r\nTXT:Zones;\r\nTXT:FrameNailing;\r\nTXT:Rotation;\r\nTXT:Flip;\r\nTXT:Breather Paper;\r\nTXT:Branders;\r\nTXT:Insulation;\r\nTXT:Tape Nailing;\r\nTXT:Glue lines;\r\nTXT:Ink lines;\r\nTXT:Internal Wall Types;\r\nTXT:External Wall Types;\r\nTXT:Modular Wall Types;\r\nTXT:Nail Specifications;\r\nTXT:Sheet Indexes;\r\nTXT:Exclude Datum X Tags;\r\nTXT:Exclude Datum Y Tags;\r\nTXT:Exclude Datum Z Tags;\r\nTXT:Resequence sheets;\r\nTXT:====================================================;\r\nTXT:FRAMING_STATION;\r\nTXT:PANEL_IDENTIFICATION_TOPRAIL;\r\nTXT:PANEL_IDENTIFICATION_BOTTOMRAIL;\r\nTXT:NAILING_BOARD_OUTSIDE;\r\nPNO:pno;\r\nFL:0;\r\nSEQUENCENUMBER:0;\r\nMASS:0;\r\nELD:EXTERIOR;\r\nDNO:A2-B.1.ST_MB-W-02;\r\nELF:INSIDE;\r\nELM:4737:2802:90:1:4737:2802:90;\r\n\r\n\r\nTS:4737:45:90:0:2757:0:SFTopPlate:L=4737:WxH=45x90:q;\r\nBS:4737:45:90:0:0:0:SFBottomPlate:L=4737:WxH=45x90:q;\r\n\r\nST:45:2712:90:0:45:0:SFStudLeft:L=2712:WxH=45x90:q;\r\nST:45:2712:90:579.5:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:1179.5:45:0:Stud:L=2712:WxH=45x90:q;\r\n\r\nSUB:180:2712:90:1523:45:0:4140c3c9-c380-4a30-95e4-ee85b9b7ec6e;\r\nST:45:2712:90:1523:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:90:2712:45:1568:45:0:Stud:L=2712:WxH=45x90:q;\r\nST:45:2712:90:1658:45:0:Stud:L=2712:WxH=45x90:q;\r\nSUE;\r\nSUB:90:2712:90:1735.5:45:0:734e3eef-157e-4301-96de-bb9ebd125f14;\r\nST:45:2712:90:1735.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nST:45:2712:90:1780.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nSUE;\r\nSUB:90:2712:90:4139.5:45:0:7bae08b0-e412-442b-b593-f30e90ea581f;\r\nST:45:2712:90:4139.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nST:45:2712:90:4184.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nSUE;\r\nSUB:90:2712:90:4647:45:0:94d63605-b69c-4247-ae2a-cd6d4b993d57;\r\nST:45:2712:90:4647:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nST:45:2712:90:4692:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nSUE;\r\nSUB:90:2712:90:2937.5:45:0:d5317c75-9036-46f2-b601-fab0f65ca838;\r\nST:45:2712:90:2937.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nST:45:2712:90:2982.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nSUE;\r\nSUB:90:2712:90:3538.5:45:0:ef81754d-15ca-4404-818b-2eb94c706f9f;\r\nST:45:2712:90:3538.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nST:45:2712:90:3583.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nSUE;\r\nSUB:90:2712:90:2336.5:45:0:f4c5fdf4-6eb9-4b3d-a1e6-725549c82fae;\r\nST:45:2712:90:2336.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nST:45:2712:90:2381.5:45:0:SFStudRight:L=2712:WxH=45x90:q;\r\nSUE;\r\n\r\nBOI1:1200:3050:9:1:9:90:11:M.B - STRUCTApanel;\r\nBOI1:1200:3050:9:1203:9:90:11:M.B - STRUCTApanel;\r\nBOI1:1200:3050:9:2405:9:90:11:M.B - STRUCTApanel;\r\nBOI1:1200:3050:9:3607:9:90:11:M.B - STRUCTApanel;\r\n\r\nBOI2:1200:2784:13:1:9:99:32:M.B - Fyrchek Plaste;\r\nBOI2:1200:2784:13:1203:9:99:32:M.B - Fyrchek Plaste;\r\nBOI2:1200:2784:13:2405:9:99:32:M.B - Fyrchek Plaste;\r\nBOI2:1200:2784:13:3607:9:99:32:M.B - Fyrchek Plaste;\r\n\r\nBOI3:1200:2784:13:602:9:112:32:M.B - Fyrchek Plaste;\r\nBOI3:1200:2784:13:1804:9:112:32:M.B - Fyrchek Plaste;\r\nBOI3:1200:2784:13:3006:9:112:32:M.B - Fyrchek Plaste;\r\nBOI3:599:2784:13:4208:9:112:32:M.B - Fyrchek Plaste;\r\n\r\n\r\n\r\nNL:23:123:99:23:2723:99:100:12;\r\nNL:51:27:99:1151:27:99:100:12;\r\nNL:51:2775:99:1151:2775:99:100:12;\r\nNL:602:123:99:602:2723:99:200:12;\r\nNL:1190.3:123:99:1190.3:2723:99:100:12;\r\nNL:1213.8:123:99:1213.8:2723:99:100:12;\r\nNL:1253:27:99:2353:27:99:100:12;\r\nNL:1253:2775:99:2353:2775:99:100:12;\r\nNL:1545.5:123:99:1545.5:2723:99:200:12;\r\nNL:1803:123:99:1803:2723:99:200:12;\r\nNL:2392.3:123:99:2392.3:2723:99:100:12;\r\nNL:2415.8:123:99:2415.8:2723:99:100:12;\r\nNL:2455:27:99:3555:27:99:100:12;\r\nNL:2455:2775:99:3555:2775:99:100:12;\r\nNL:3005:123:99:3005:2723:99:200:12;\r\nNL:3594.3:123:99:3594.3:2723:99:100:12;\r\nNL:3617.8:123:99:3617.8:2723:99:100:12;\r\nNL:3621:27:99:4721:27:99:100:12;\r\nNL:3621:2775:99:4721:2775:99:100:12;\r\nNL:4207:123:99:4207:2723:99:200:12;\r\nNL:4713.5:123:99:4713.5:2723:99:100:12;\r\n\r\nNL:23:99:112:23:2703:112:2604:15;\r\nNL:23:303:112:23:2103:112:600:15;\r\nNL:602:99:112:602:2703:112:2604:15;\r\nNL:602:303:112:602:2103:112:600:15;\r\nNL:1190.3:99:112:1190.3:2703:112:2604:15;\r\nNL:1190.3:303:112:1190.3:2103:112:600:15;\r\nNL:1213.8:99:112:1213.8:2703:112:2604:15;\r\nNL:1213.8:303:112:1213.8:2103:112:600:15;\r\nNL:1545.5:99:112:1545.5:2703:112:2604:15;\r\nNL:1545.5:303:112:1545.5:2103:112:600:15;\r\nNL:1680.5:99:112:1680.5:2703:112:2604:15;\r\nNL:1680.5:303:112:1680.5:2103:112:600:15;\r\nNL:1758:99:112:1758:2703:112:2604:15;\r\nNL:1758:303:112:1758:2103:112:600:15;\r\nNL:1803:99:112:1803:2703:112:2604:15;\r\nNL:1803:303:112:1803:2103:112:600:15;\r\nNL:2359:99:112:2359:2703:112:2604:15;\r\nNL:2359:303:112:2359:2103:112:600:15;\r\nNL:2392.3:99:112:2392.3:2703:112:2604:15;\r\nNL:2392.3:303:112:2392.3:2103:112:600:15;\r\nNL:2415.8:99:112:2415.8:2703:112:2604:15;\r\nNL:2415.8:303:112:2415.8:2103:112:600:15;\r\nNL:2960:99:112:2960:2703:112:2604:15;\r\nNL:2960:303:112:2960:2103:112:600:15;\r\nNL:3005:99:112:3005:2703:112:2604:15;\r\nNL:3005:303:112:3005:2103:112:600:15;\r\nNL:3561:99:112:3561:2703:112:2604:15;\r\nNL:3561:303:112:3561:2103:112:600:15;\r\nNL:3594.3:99:112:3594.3:2703:112:2604:15;\r\nNL:3594.3:303:112:3594.3:2103:112:600:15;\r\nNL:3617.8:99:112:3617.8:2703:112:2604:15;\r\nNL:3617.8:303:112:3617.8:2103:112:600:15;\r\nNL:4162:99:112:4162:2703:112:2604:15;\r\nNL:4162:303:112:4162:2103:112:600:15;\r\nNL:4207:99:112:4207:2703:112:2604:15;\r\nNL:4207:303:112:4207:2103:112:600:15;\r\nNL:4669.5:99:112:4669.5:2703:112:2604:15;\r\nNL:4669.5:303:112:4669.5:2103:112:600:15;\r\nNL:4701:99:112:4701:2703:112:2604:15;\r\nNL:4701:303:112:4701:2103:112:600:15;\r\n\r\nNL:613.3:59:125:613.3:2743:125:2684:15;\r\nNL:613.3:193:125:613.3:2593:125:150:15;\r\nNL:1202:59:125:1202:2743:125:2684:15;\r\nNL:1202:193:125:1202:2593:125:150:15;\r\nNL:1545.5:59:125:1545.5:2743:125:2684:15;\r\nNL:1545.5:193:125:1545.5:2593:125:150:15;\r\nNL:1680.5:59:125:1680.5:2743:125:2684:15;\r\nNL:1680.5:193:125:1680.5:2593:125:150:15;\r\nNL:1758:59:125:1758:2743:125:2684:15;\r\nNL:1758:193:125:1758:2593:125:150:15;\r\nNL:1791.3:59:125:1791.3:2743:125:2684:15;\r\nNL:1791.3:193:125:1791.3:2593:125:150:15;\r\nNL:1814.8:59:125:1814.8:2743:125:2684:15;\r\nNL:1814.8:193:125:1814.8:2593:125:150:15;\r\nNL:2359:59:125:2359:2743:125:2684:15;\r\nNL:2359:193:125:2359:2593:125:150:15;\r\nNL:2404:59:125:2404:2743:125:2684:15;\r\nNL:2404:193:125:2404:2593:125:150:15;\r\nNL:2960:59:125:2960:2743:125:2684:15;\r\nNL:2960:193:125:2960:2593:125:150:15;\r\nNL:2993.3:59:125:2993.3:2743:125:2684:15;\r\nNL:2993.3:193:125:2993.3:2593:125:150:15;\r\nNL:3016.8:59:125:3016.8:2743:125:2684:15;\r\nNL:3016.8:193:125:3016.8:2593:125:150:15;\r\nNL:3561:59:125:3561:2743:125:2684:15;\r\nNL:3561:193:125:3561:2593:125:150:15;\r\nNL:3606:59:125:3606:2743:125:2684:15;\r\nNL:3606:193:125:3606:2593:125:150:15;\r\nNL:4162:59:125:4162:2743:125:2684:15;\r\nNL:4162:193:125:4162:2593:125:150:15;\r\nNL:4195.3:59:125:4195.3:2743:125:2684:15;\r\nNL:4195.3:193:125:4195.3:2593:125:150:15;\r\nNL:4218.8:59:125:4218.8:2743:125:2684:15;\r\nNL:4218.8:193:125:4218.8:2593:125:150:15;\r\nNL:4669.5:59:125:4669.5:2743:125:2684:15;\r\nNL:4669.5:193:125:4669.5:2593:125:150:15;\r\nNL:4701:59:125:4701:2743:125:2684:15;\r\nNL:4701:193:125:4701:2593:125:150:15;\r\n\r\n\r\nROB:4735:9:99:1;\r\nRL:4735:3059:90:0;\r\nRL:4807:3059:90:0;\r\nRL:4807:9:90:0;\r\nRL:4735:9:90:0;\r\nROE;\r\nROB:4711:9:112:1;\r\nRL:4711:2793:99:0;\r\nRL:4807:2793:99:0;\r\nRL:4807:9:99:0;\r\nRL:4711:9:99:0;\r\nROE;\r\nROB:4711:9:125:1;\r\nRL:4711:2793:112:0;\r\nRL:4807:2793:112:0;\r\nRL:4807:9:112:0;\r\nRL:4711:9:112:0;\r\nROE;\r\nROB:4735:2793:99:2;\r\nRL:1:2793:90:0;\r\nROE;\r\n\r\nINK:2368.5:2802:0:MB-W-02;\r\n\r\nINK:2368.5:0:0:MB-W-02;\r\n\r\nFST:22:0:20:22:70:20:0:Standard Nail;\r\nFST:22:0:45:22:70:45:0:Standard Nail;\r\nFST:22:0:70:22:70:70:0:Standard Nail;\r\nFST:22:2802:20:22:2732:20:0:Standard Nail;\r\nFST:22:2802:45:22:2732:45:0:Standard Nail;\r\nFST:22:2802:70:22:2732:70:0:Standard Nail;\r\nFST:601.5:0:20:601.5:70:20:0:Standard Nail;\r\nFST:601.5:0:45:601.5:70:45:0:Standard Nail;\r\nFST:601.5:0:70:601.5:70:70:0:Standard Nail;\r\nFST:601.5:2802:20:601.5:2732:20:0:Standard Nail;\r\nFST:601.5:2802:45:601.5:2732:45:0:Standard Nail;\r\nFST:601.5:2802:70:601.5:2732:70:0:Standard Nail;\r\nFST:1201.5:0:20:1201.5:70:20:0:Standard Nail;\r\nFST:1201.5:0:45:1201.5:70:45:0:Standard Nail;\r\nFST:1201.5:0:70:1201.5:70:70:0:Standard Nail;\r\nFST:1201.5:2802:20:1201.5:2732:20:0:Standard Nail;\r\nFST:1201.5:2802:45:1201.5:2732:45:0:Standard Nail;\r\nFST:1201.5:2802:70:1201.5:2732:70:0:Standard Nail;\r\nFST:1545:0:20:1545:70:20:0:Standard Nail;\r\nFST:1545:0:45:1545:70:45:0:Standard Nail;\r\nFST:1545:0:70:1545:70:70:0:Standard Nail;\r\nFST:1545:2802:20:1545:2732:20:0:Standard Nail;\r\nFST:1545:2802:45:1545:2732:45:0:Standard Nail;\r\nFST:1545:2802:70:1545:2732:70:0:Standard Nail;\r\nFST:1588:0:23:1588:70:23:0:Standard Nail;\r\nFST:1588:2802:23:1588:2732:23:0:Standard Nail;\r\nFST:1613:0:23:1613:70:23:0:Standard Nail;\r\nFST:1613:2802:23:1613:2732:23:0:Standard Nail;\r\nFST:1638:0:23:1638:70:23:0:Standard Nail;\r\nFST:1638:2802:23:1638:2732:23:0:Standard Nail;\r\nFST:1680:0:20:1680:70:20:0:Standard Nail;\r\nFST:1680:0:45:1680:70:45:0:Standard Nail;\r\nFST:1680:0:70:1680:70:70:0:Standard Nail;\r\nFST:1680:2802:20:1680:2732:20:0:Standard Nail;\r\nFST:1680:2802:45:1680:2732:45:0:Standard Nail;\r\nFST:1680:2802:70:1680:2732:70:0:Standard Nail;\r\nFST:1757.5:0:20:1757.5:70:20:0:Standard Nail;\r\nFST:1757.5:0:45:1757.5:70:45:0:Standard Nail;\r\nFST:1757.5:0:70:1757.5:70:70:0:Standard Nail;\r\nFST:1757.5:2802:20:1757.5:2732:20:0:Standard Nail;\r\nFST:1757.5:2802:45:1757.5:2732:45:0:Standard Nail;\r\nFST:1757.5:2802:70:1757.5:2732:70:0:Standard Nail;\r\nFST:1802.5:0:20:1802.5:70:20:0:Standard Nail;\r\nFST:1802.5:0:45:1802.5:70:45:0:Standard Nail;\r\nFST:1802.5:0:70:1802.5:70:70:0:Standard Nail;\r\nFST:1802.5:2802:20:1802.5:2732:20:0:Standard Nail;\r\nFST:1802.5:2802:45:1802.5:2732:45:0:Standard Nail;\r\nFST:1802.5:2802:70:1802.5:2732:70:0:Standard Nail;\r\nFST:2358.5:0:20:2358.5:70:20:0:Standard Nail;\r\nFST:2358.5:0:45:2358.5:70:45:0:Standard Nail;\r\nFST:2358.5:0:70:2358.5:70:70:0:Standard Nail;\r\nFST:2358.5:2802:20:2358.5:2732:20:0:Standard Nail;\r\nFST:2358.5:2802:45:2358.5:2732:45:0:Standard Nail;\r\nFST:2358.5:2802:70:2358.5:2732:70:0:Standard Nail;\r\nFST:2403.5:0:20:2403.5:70:20:0:Standard Nail;\r\nFST:2403.5:0:45:2403.5:70:45:0:Standard Nail;\r\nFST:2403.5:0:70:2403.5:70:70:0:Standard Nail;\r\nFST:2403.5:2802:20:2403.5:2732:20:0:Standard Nail;\r\nFST:2403.5:2802:45:2403.5:2732:45:0:Standard Nail;\r\nFST:2403.5:2802:70:2403.5:2732:70:0:Standard Nail;\r\nFST:2959.5:0:20:2959.5:70:20:0:Standard Nail;\r\nFST:2959.5:0:45:2959.5:70:45:0:Standard Nail;\r\nFST:2959.5:0:70:2959.5:70:70:0:Standard Nail;\r\nFST:2959.5:2802:20:2959.5:2732:20:0:Standard Nail;\r\nFST:2959.5:2802:45:2959.5:2732:45:0:Standard Nail;\r\nFST:2959.5:2802:70:2959.5:2732:70:0:Standard Nail;\r\nFST:3004.5:0:20:3004.5:70:20:0:Standard Nail;\r\nFST:3004.5:0:45:3004.5:70:45:0:Standard Nail;\r\nFST:3004.5:0:70:3004.5:70:70:0:Standard Nail;\r\nFST:3004.5:2802:20:3004.5:2732:20:0:Standard Nail;\r\nFST:3004.5:2802:45:3004.5:2732:45:0:Standard Nail;\r\nFST:3004.5:2802:70:3004.5:2732:70:0:Standard Nail;\r\nFST:3560.5:0:20:3560.5:70:20:0:Standard Nail;\r\nFST:3560.5:0:45:3560.5:70:45:0:Standard Nail;\r\nFST:3560.5:0:70:3560.5:70:70:0:Standard Nail;\r\nFST:3560.5:2802:20:3560.5:2732:20:0:Standard Nail;\r\nFST:3560.5:2802:45:3560.5:2732:45:0:Standard Nail;\r\nFST:3560.5:2802:70:3560.5:2732:70:0:Standard Nail;\r\nFST:3605.5:0:20:3605.5:70:20:0:Standard Nail;\r\nFST:3605.5:0:45:3605.5:70:45:0:Standard Nail;\r\nFST:3605.5:0:70:3605.5:70:70:0:Standard Nail;\r\nFST:3605.5:2802:20:3605.5:2732:20:0:Standard Nail;\r\nFST:3605.5:2802:45:3605.5:2732:45:0:Standard Nail;\r\nFST:3605.5:2802:70:3605.5:2732:70:0:Standard Nail;\r\nFST:4161.5:0:20:4161.5:70:20:0:Standard Nail;\r\nFST:4161.5:0:45:4161.5:70:45:0:Standard Nail;\r\nFST:4161.5:0:70:4161.5:70:70:0:Standard Nail;\r\nFST:4161.5:2802:20:4161.5:2732:20:0:Standard Nail;\r\nFST:4161.5:2802:45:4161.5:2732:45:0:Standard Nail;\r\nFST:4161.5:2802:70:4161.5:2732:70:0:Standard Nail;\r\nFST:4206.5:0:20:4206.5:70:20:0:Standard Nail;\r\nFST:4206.5:0:45:4206.5:70:45:0:Standard Nail;\r\nFST:4206.5:0:70:4206.5:70:70:0:Standard Nail;\r\nFST:4206.5:2802:20:4206.5:2732:20:0:Standard Nail;\r\nFST:4206.5:2802:45:4206.5:2732:45:0:Standard Nail;\r\nFST:4206.5:2802:70:4206.5:2732:70:0:Standard Nail;\r\nFST:4669:0:20:4669:70:20:0:Standard Nail;\r\nFST:4669:0:45:4669:70:45:0:Standard Nail;\r\nFST:4669:0:70:4669:70:70:0:Standard Nail;\r\nFST:4669:2802:20:4669:2732:20:0:Standard Nail;\r\nFST:4669:2802:45:4669:2732:45:0:Standard Nail;\r\nFST:4669:2802:70:4669:2732:70:0:Standard Nail;\r\nFST:4714:0:20:4714:70:20:0:Standard Nail;\r\nFST:4714:0:45:4714:70:45:0:Standard Nail;\r\nFST:4714:0:70:4714:70:70:0:Standard Nail;\r\nFST:4714:2802:20:4714:2732:20:0:Standard Nail;\r\nFST:4714:2802:45:4714:2732:45:0:Standard Nail;\r\nFST:4714:2802:70:4714:2732:70:0:Standard Nail;\r\n\r\n\r\nEOF;\r\n"},{"name":"A2-B_1_ST_MB-C-01.cdt","raw":"COPYRIGHT: Randek AB. This document/file is protected by copyright proprietary to Randek AB and may only be used for the intended purpose. This document/file may not be copied, used, distributed or similar, without the prior written approval of Randek AB.;\r\n\r\nVERSION:5.0.15;\r\nTXT:====================================================;\r\nTXT:Executable;\r\nTXT:Hsb-Version;\r\nTXT:Randek-Version;\r\nTXT:Zones;\r\nTXT:FrameNailing;\r\nTXT:Rotation;\r\nTXT:Flip;\r\nTXT:Breather Paper;\r\nTXT:Branders;\r\nTXT:Insulation;\r\nTXT:Tape Nailing;\r\nTXT:Glue lines;\r\nTXT:Ink lines;\r\nTXT:Internal Wall Types;\r\nTXT:External Wall Types;\r\nTXT:Modular Wall Types;\r\nTXT:Nail Specifications;\r\nTXT:Sheet Indexes;\r\nTXT:Exclude Datum X Tags;\r\nTXT:Exclude Datum Y Tags;\r\nTXT:Exclude Datum Z Tags;\r\nTXT:Resequence sheets;\r\nTXT:====================================================;\r\nTXT:FRAMING_STATION;\r\nTXT:PANEL_IDENTIFICATION_TOPRAIL;\r\nTXT:PANEL_IDENTIFICATION_BOTTOMRAIL;\r\nTXT:NAILING_BOARD_INSIDE;\r\nPNO:pno;\r\nFL:0;\r\nSEQUENCENUMBER:0;\r\nMASS:0;\r\nELD:EXTERIOR;\r\nDNO:A2-B.1.ST_MB-C-01;\r\nELF:INSIDE;\r\nELM:4384:3113.5:150:1:4384:3113:150;\r\n\r\n\r\nTS:4384:45:150:0:3023.5:0:SFTopPlate:L=4384:WxH=45x150:q;\r\nTS:4384:45:150:0:3068.5:0:SFVeryTopPlate:L=4384:WxH=45x150:q;\r\nBS:4384:45:150:0:45:0:SFBottomPlate:L=4384:WxH=45x150:q;\r\nBS:4384:45:150:0:0:0:SFVeryBottomPlate:L=4384:WxH=45x150:q;\r\n\r\nST:45:2933.5:150:0:90:0:DakLeftEdge:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:579.5:90:0:DakCenterJoist:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:1180.5:90:0:DakCenterJoist:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:1781.5:90:0:DakCenterJoist:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:2382.5:90:0:DakCenterJoist:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:2983.5:90:0:DakCenterJoist:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:3584.5:90:0:DakCenterJoist:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:4185.5:90:0:DakRightEdge:L=2933:WxH=45x150:q;\r\nST:45:2933.5:150:4339:90:0:DakRightEdge:L=2933:WxH=45x150:q;\r\n\r\nSTL:534.5:45:90:45:640.7:0:SFBlocking:L=535:WxH=45x90:q;\r\nSTL:534.5:45:90:45:1832.1:0:SFBlocking:L=535:WxH=45x90:q;\r\nSTL:534.5:45:90:45:1236.4:0:SFBlocking:L=535:WxH=45x90:q;\r\nSTL:534.5:45:90:45:2427.8:0:SFBlocking:L=535:WxH=45x90:q;\r\nSTL:556:45:90:624.5:640.7:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:624.5:1832.1:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:624.5:1236.4:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:624.5:2427.8:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1225.5:1236.4:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1225.5:2427.8:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1225.5:640.7:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1225.5:1832.1:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1826.5:2427.8:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1826.5:1236.4:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1826.5:640.7:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:1826.5:1832.1:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:150:45:2427.5:1181:0:DakCenterJoist:L=556:WxH=45x150:q;\r\nSTL:556:45:90:2427.5:2427.8:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:2427.5:640.7:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:2427.5:1832.1:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3028.5:2427.8:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3028.5:1832.1:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3028.5:640.7:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3028.5:1236.4:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3629.5:1832.1:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3629.5:1236.4:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:90:3629.5:2414.2:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:556:45:150:3629.5:2459.2:0:SFBlocking:L=556:WxH=45x150:q;\r\nSTL:556:45:150:3629.5:609.2:0:SFBlocking:L=556:WxH=45x150:q;\r\nSTL:556:45:90:3629.5:654.2:0:SFBlocking:L=556:WxH=45x90:q;\r\nSTL:108.5:45:150:4230.5:609.2:0:SFBlocking:L=108:WxH=45x150:q;\r\nSTL:108.5:45:90:4230.5:654.2:0:SFBlocking:L=108:WxH=45x90:q;\r\nSTL:108.5:45:150:4230.5:2459.2:0:SFBlocking:L=108:WxH=45x150:q;\r\nSTL:108.5:45:90:4230.5:2414.2:0:SFBlocking:L=108:WxH=45x90:q;\r\nSTL:108.5:45:90:4230.5:1236.4:0:SFBlocking:L=108:WxH=45x90:q;\r\nSTL:108.5:45:90:4230.5:1832.1:0:SFBlocking:L=108:WxH=45x90:q;\r\n\r\nBOO1:599:3600:16:2:-486.5:-16:32:M.B - Fyrchek Plaste;\r\nBOO1:1200:3600:16:603:-486.5:-16:32:M.B - Fyrchek Plaste;\r\nBOO1:1200:3600:16:1805:-486.5:-16:32:M.B - Fyrchek Plaste;\r\nBOO1:1200:3600:16:3007:-486.5:-16:32:M.B - Fyrchek Plaste;\r\nBOO1:599:3600:16:4209:-486.5:-16:32:M.B - Fyrchek Plaste;\r\n\r\nBOO2:1200:3600:16:2:-486.5:-32:32:M.B - Fyrchek Plaste;\r\nBOO2:1200:3600:16:1204:-486.5:-32:32:M.B - Fyrchek Plaste;\r\nBOO2:1200:3600:16:2406:-486.5:-32:32:M.B - Fyrchek Plaste;\r\nBOO2:1200:3600:16:3608:-486.5:-32:32:M.B - Fyrchek Plaste;\r\n\r\n\r\nNL:23.5:156.7:-16:23.5:2956.7:-16:100:15;\r\nNL:51.5:663.2:-16:451.5:663.2:-16:200:15;\r\nNL:51.5:1258.9:-16:451.5:1258.9:-16:200:15;\r\nNL:51.5:1854.6:-16:451.5:1854.6:-16:200:15;\r\nNL:51.5:2450.3:-16:451.5:2450.3:-16:200:15;\r\nNL:101.5:22.5:-16:501.5:22.5:-16:100:15;\r\nNL:101.5:3091:-16:501.5:3091:-16:100:15;\r\nNL:590.2:156.7:-16:590.2:2956.7:-16:100:15;\r\nNL:613.7:156.7:-16:613.7:2956.7:-16:100:15;\r\nNL:653:663.2:-16:1653:663.2:-16:200:15;\r\nNL:653:1258.9:-16:1653:1258.9:-16:200:15;\r\nNL:653:1854.6:-16:1653:1854.6:-16:200:15;\r\nNL:653:2450.3:-16:1653:2450.3:-16:200:15;\r\nNL:703:22.5:-16:1703:22.5:-16:100:15;\r\nNL:703:3091:-16:1703:3091:-16:100:15;\r\nNL:1203:156.7:-16:1203:2956.7:-16:200:15;\r\nNL:1792.2:156.7:-16:1792.2:2956.7:-16:100:15;\r\nNL:1815.8:156.7:-16:1815.8:2956.7:-16:100:15;\r\nNL:1905:22.5:-16:2905:22.5:-16:100:15;\r\nNL:1905:3091:-16:2905:3091:-16:100:15;\r\nNL:2005:663.2:-16:2805:663.2:-16:200:15;\r\nNL:2005:1258.9:-16:2805:1258.9:-16:200:15;\r\nNL:2005:1854.6:-16:2805:1854.6:-16:200:15;\r\nNL:2005:2450.3:-16:2805:2450.3:-16:200:15;\r\nNL:2405:156.7:-16:2405:2956.7:-16:200:15;\r\nNL:2994.3:156.7:-16:2994.3:2956.7:-16:100:15;\r\nNL:3017.7:156.7:-16:3017.7:2956.7:-16:100:15;\r\nNL:3087:663.2:-16:4287:663.2:-16:200:15;\r\nNL:3087:1258.9:-16:4287:1258.9:-16:200:15;\r\nNL:3087:1854.6:-16:4287:1854.6:-16:200:15;\r\nNL:3092:2450.3:-16:4292:2450.3:-16:200:15;\r\nNL:3157:28.5:-16:4357:28.5:-16:100:15;\r\nNL:3162:3091:-16:4362:3091:-16:100:15;\r\nNL:3607:156.7:-16:3607:2956.7:-16:200:15;\r\nNL:4196.7:156.7:-16:4196.7:2956.7:-16:100:15;\r\nNL:4219.2:156.7:-16:4219.2:2956.7:-16:100:15;\r\nNL:4359.5:156.7:-16:4359.5:2956.7:-16:100:15;\r\n\r\nNL:23.5:106.7:-32:23.5:3006.7:-32:100:15;\r\nNL:52:22.5:-32:1152:22.5:-32:100:15;\r\nNL:52:3091:-32:1152:3091:-32:100:15;\r\nNL:102:663.2:-32:1102:663.2:-32:200:15;\r\nNL:102:1258.9:-32:1102:1258.9:-32:200:15;\r\nNL:102:1854.6:-32:1102:1854.6:-32:200:15;\r\nNL:102:2450.3:-32:1102:2450.3:-32:200:15;\r\nNL:602:206.7:-32:602:3006.7:-32:200:15;\r\nNL:1191.3:106.7:-32:1191.3:3006.7:-32:100:15;\r\nNL:1214.8:106.7:-32:1214.8:3006.7:-32:100:15;\r\nNL:1254:22.5:-32:2354:22.5:-32:100:15;\r\nNL:1254:3091:-32:2354:3091:-32:100:15;\r\nNL:1304:663.2:-32:2304:663.2:-32:200:15;\r\nNL:1304:1258.9:-32:2304:1258.9:-32:200:15;\r\nNL:1304:1854.6:-32:2304:1854.6:-32:200:15;\r\nNL:1304:2450.3:-32:2304:2450.3:-32:200:15;\r\nNL:1804:206.7:-32:1804:3006.7:-32:200:15;\r\nNL:2393.3:106.7:-32:2393.3:3006.7:-32:100:15;\r\nNL:2416.8:106.7:-32:2416.8:3006.7:-32:100:15;\r\nNL:2438:22.5:-32:4338:22.5:-32:100:15;\r\nNL:2438:3091:-32:4338:3091:-32:100:15;\r\nNL:2506:663.2:-32:3506:663.2:-32:200:15;\r\nNL:2506:1258.9:-32:3506:1258.9:-32:200:15;\r\nNL:2506:1854.6:-32:3506:1854.6:-32:200:15;\r\nNL:2506:2450.3:-32:3506:2450.3:-32:200:15;\r\nNL:3006:206.7:-32:3006:3006.7:-32:200:15;\r\nNL:3595.3:106.7:-32:3595.3:3006.7:-32:100:15;\r\nNL:3617.8:106.7:-32:3617.8:3006.7:-32:100:15;\r\nNL:3670:663.2:-32:4270:663.2:-32:200:15;\r\nNL:3670:1258.9:-32:4270:1258.9:-32:200:15;\r\nNL:3670:1854.6:-32:4270:1854.6:-32:200:15;\r\nNL:3670:2450.3:-32:4270:2450.3:-32:200:15;\r\nNL:4208:206.7:-32:4208:3006.7:-32:200:15;\r\nNL:4359.5:106.7:-32:4359.5:3006.7:-32:100:15;\r\n\r\n\r\n\r\nROB:4382:-486.5:-16:1;\r\nRL:4382:3113.5:0:0;\r\nRL:4808:3113.5:0:0;\r\nRL:4808:-486.5:0:0;\r\nRL:4382:-486.5:0:0;\r\nROE;\r\nROB:4382:-486.5:-32:1;\r\nRL:4382:3113.5:-16:0;\r\nRL:4808:3113.5:-16:0;\r\nRL:4808:-486.5:-16:0;\r\nRL:4382:-486.5:-16:0;\r\nROE;\r\nROB:2:0:-16:2;\r\nRL:4382:0:0:0;\r\nROE;\r\nROB:2:0:-32:2;\r\nRL:4382:0:-16:0;\r\nROE;\r\n\r\nINK:2192:3068.5:0:MB-C-01;\r\nINK:2192:-45:0:MB-C-01;\r\n\r\nFST:22:45:21:22:115:21:0:Standard Nail;\r\nFST:22:45:57:22:115:57:0:Standard Nail;\r\nFST:22:45:93:22:115:93:0:Standard Nail;\r\nFST:22:45:129:22:115:129:0:Standard Nail;\r\nFST:22:3068.5:21:22:2998.5:21:0:Standard Nail;\r\nFST:22:3068.5:57:22:2998.5:57:0:Standard Nail;\r\nFST:22:3068.5:93:22:2998.5:93:0:Standard Nail;\r\nFST:22:3068.5:129:22:2998.5:129:0:Standard Nail;\r\nFST:601.5:45:21:601.5:115:21:0:Standard Nail;\r\nFST:601.5:45:57:601.5:115:57:0:Standard Nail;\r\nFST:601.5:45:93:601.5:115:93:0:Standard Nail;\r\nFST:601.5:45:129:601.5:115:129:0:Standard Nail;\r\nFST:601.5:3068.5:21:601.5:2998.5:21:0:Standard Nail;\r\nFST:601.5:3068.5:57:601.5:2998.5:57:0:Standard Nail;\r\nFST:601.5:3068.5:93:601.5:2998.5:93:0:Standard Nail;\r\nFST:601.5:3068.5:129:601.5:2998.5:129:0:Standard Nail;\r\nFST:1202.5:45:21:1202.5:115:21:0:Standard Nail;\r\nFST:1202.5:45:57:1202.5:115:57:0:Standard Nail;\r\nFST:1202.5:45:93:1202.5:115:93:0:Standard Nail;\r\nFST:1202.5:45:129:1202.5:115:129:0:Standard Nail;\r\nFST:1202.5:3068.5:21:1202.5:2998.5:21:0:Standard Nail;\r\nFST:1202.5:3068.5:57:1202.5:2998.5:57:0:Standard Nail;\r\nFST:1202.5:3068.5:93:1202.5:2998.5:93:0:Standard Nail;\r\nFST:1202.5:3068.5:129:1202.5:2998.5:129:0:Standard Nail;\r\nFST:1803.5:45:21:1803.5:115:21:0:Standard Nail;\r\nFST:1803.5:45:57:1803.5:115:57:0:Standard Nail;\r\nFST:1803.5:45:93:1803.5:115:93:0:Standard Nail;\r\nFST:1803.5:45:129:1803.5:115:129:0:Standard Nail;\r\nFST:1803.5:3068.5:21:1803.5:2998.5:21:0:Standard Nail;\r\nFST:1803.5:3068.5:57:1803.5:2998.5:57:0:Standard Nail;\r\nFST:1803.5:3068.5:93:1803.5:2998.5:93:0:Standard Nail;\r\nFST:1803.5:3068.5:129:1803.5:2998.5:129:0:Standard Nail;\r\nFST:2404.5:45:21:2404.5:115:21:0:Standard Nail;\r\nFST:2404.5:45:57:2404.5:115:57:0:Standard Nail;\r\nFST:2404.5:45:93:2404.5:115:93:0:Standard Nail;\r\nFST:2404.5:45:129:2404.5:115:129:0:Standard Nail;\r\nFST:2404.5:3068.5:21:2404.5:2998.5:21:0:Standard Nail;\r\nFST:2404.5:3068.5:57:2404.5:2998.5:57:0:Standard Nail;\r\nFST:2404.5:3068.5:93:2404.5:2998.5:93:0:Standard Nail;\r\nFST:2404.5:3068.5:129:2404.5:2998.5:129:0:Standard Nail;\r\nFST:3005.5:45:21:3005.5:115:21:0:Standard Nail;\r\nFST:3005.5:45:57:3005.5:115:57:0:Standard Nail;\r\nFST:3005.5:45:93:3005.5:115:93:0:Standard Nail;\r\nFST:3005.5:45:129:3005.5:115:129:0:Standard Nail;\r\nFST:3005.5:3068.5:21:3005.5:2998.5:21:0:Standard Nail;\r\nFST:3005.5:3068.5:57:3005.5:2998.5:57:0:Standard Nail;\r\nFST:3005.5:3068.5:93:3005.5:2998.5:93:0:Standard Nail;\r\nFST:3005.5:3068.5:129:3005.5:2998.5:129:0:Standard Nail;\r\nFST:3606.5:45:21:3606.5:115:21:0:Standard Nail;\r\nFST:3606.5:45:57:3606.5:115:57:0:Standard Nail;\r\nFST:3606.5:45:93:3606.5:115:93:0:Standard Nail;\r\nFST:3606.5:45:129:3606.5:115:129:0:Standard Nail;\r\nFST:3606.5:3068.5:21:3606.5:2998.5:21:0:Standard Nail;\r\nFST:3606.5:3068.5:57:3606.5:2998.5:57:0:Standard Nail;\r\nFST:3606.5:3068.5:93:3606.5:2998.5:93:0:Standard Nail;\r\nFST:3606.5:3068.5:129:3606.5:2998.5:129:0:Standard Nail;\r\nFST:4207.5:45:21:4207.5:115:21:0:Standard Nail;\r\nFST:4207.5:45:57:4207.5:115:57:0:Standard Nail;\r\nFST:4207.5:45:93:4207.5:115:93:0:Standard Nail;\r\nFST:4207.5:45:129:4207.5:115:129:0:Standard Nail;\r\nFST:4207.5:3068.5:21:4207.5:2998.5:21:0:Standard Nail;\r\nFST:4207.5:3068.5:57:4207.5:2998.5:57:0:Standard Nail;\r\nFST:4207.5:3068.5:93:4207.5:2998.5:93:0:Standard Nail;\r\nFST:4207.5:3068.5:129:4207.5:2998.5:129:0:Standard Nail;\r\nFST:4361:45:21:4361:115:21:0:Standard Nail;\r\nFST:4361:45:57:4361:115:57:0:Standard Nail;\r\nFST:4361:45:93:4361:115:93:0:Standard Nail;\r\nFST:4361:45:129:4361:115:129:0:Standard Nail;\r\nFST:4361:3068.5:21:4361:2998.5:21:0:Standard Nail;\r\nFST:4361:3068.5:57:4361:2998.5:57:0:Standard Nail;\r\nFST:4361:3068.5:93:4361:2998.5:93:0:Standard Nail;\r\nFST:4361:3068.5:129:4361:2998.5:129:0:Standard Nail;\r\n\r\n\r\nEOF;\r\n"}];
+
+// ─── Settings ─────────────────────────────────────────────────────────────
+const DEFAULTS={cStud:'#c8a26e',cPlate:'#a07840',cHeader:'#d4a44a',cSill:'#bfa060',cSheet:'#7a9a6a',cOpening:'#cc3333',cDim:'#0066cc',cMeasure:'#dd4444',dimFont:9,dimTick:3,dimLine:5,dimExt:'2,2',chainOff1:16,chainOff2:28,overallOff:42,scale:12,subColour:false,cSub0:'#2266aa',cSub1:'#aa6622',cSub2:'#22aa66',cSub3:'#aa2266',
+hdrFont:8,hdrOrient:'0',hdrPlace:'centre',hdrOff:0,
+sillFont:8,sillOrient:'0',sillPlace:'centre',sillOff:0,
+overFont:8,overOrient:'-90',overPlace:'centre',overOff:0,
+underFont:8,underOrient:'-90',underPlace:'centre',underOff:0};
+let S={...DEFAULTS};
+
+const COLOR_IDS=['cStud','cPlate','cHeader','cSill','cSheet','cOpening','cDim','cMeasure','cSub0','cSub1','cSub2','cSub3'];
+function loadSettings(){try{const s=localStorage.getItem('cdtS4');if(s)S={...DEFAULTS,...JSON.parse(s)};}catch(e){}applyToUI();}
+function saveSettings(){try{localStorage.setItem('cdtS4',JSON.stringify(S));}catch(e){}}
+function applyToUI(){
+  COLOR_IDS.forEach(id=>{const el=document.getElementById(id);if(el)el.value=S[id];});
+  document.getElementById('chkSubColour').checked=S.subColour;
+  document.getElementById('rDimFont').value=S.dimFont;document.getElementById('vDimFont').textContent=S.dimFont+'px';
+  document.getElementById('rDimTick').value=S.dimTick;document.getElementById('vDimTick').textContent=S.dimTick;
+  document.getElementById('rDimLine').value=S.dimLine;document.getElementById('vDimLine').textContent=(S.dimLine/10).toFixed(1);
+  document.getElementById('sDimExt').value=S.dimExt;
+  document.getElementById('nChainOff1').value=S.chainOff1;
+  document.getElementById('nChainOff2').value=S.chainOff2;
+  document.getElementById('nOverallOff').value=S.overallOff;
+  document.getElementById('rScale').value=S.scale;document.getElementById('vScale').textContent=(S.scale/100).toFixed(2);
+  // spec labels
+  ['Hdr','Sill','Over','Under'].forEach(k=>{
+    const lk=k.toLowerCase();
+    document.getElementById('r'+k+'Font').value=S[lk+'Font'];document.getElementById('v'+k+'Font').textContent=S[lk+'Font']+'px';
+    document.getElementById('s'+k+'Orient').value=S[lk+'Orient'];
+    document.getElementById('s'+k+'Place').value=S[lk+'Place'];
+    document.getElementById('n'+k+'Off').value=S[lk+'Off'];
+  });
+  document.querySelectorAll('.settings-panel .row').forEach(r=>{const inp=r.querySelector('input[type=color]');const v=r.querySelector('.val');if(inp&&v)v.textContent=inp.value;});
+}
+function readFromUI(){
+  COLOR_IDS.forEach(id=>{const el=document.getElementById(id);if(el)S[id]=el.value;});
+  S.subColour=document.getElementById('chkSubColour').checked;
+  S.dimFont=+document.getElementById('rDimFont').value;S.dimTick=+document.getElementById('rDimTick').value;
+  S.dimLine=+document.getElementById('rDimLine').value;S.dimExt=document.getElementById('sDimExt').value;
+  S.chainOff1=+document.getElementById('nChainOff1').value;S.chainOff2=+document.getElementById('nChainOff2').value;
+  S.overallOff=+document.getElementById('nOverallOff').value;S.scale=+document.getElementById('rScale').value;
+  ['Hdr','Sill','Over','Under'].forEach(k=>{
+    const lk=k.toLowerCase();
+    S[lk+'Font']=+document.getElementById('r'+k+'Font').value;
+    S[lk+'Orient']=document.getElementById('s'+k+'Orient').value;
+    S[lk+'Place']=document.getElementById('s'+k+'Place').value;
+    S[lk+'Off']=+document.getElementById('n'+k+'Off').value;
+  });
+  saveSettings();
+}
+document.getElementById('btnSettings').onclick=()=>document.getElementById('settingsOverlay').classList.add('open');
+document.getElementById('btnSettingsClose').onclick=()=>{document.getElementById('settingsOverlay').classList.remove('open');readFromUI();render();};
+document.getElementById('btnSettingsReset').onclick=()=>{S={...DEFAULTS};applyToUI();};
+document.querySelectorAll('.settings-panel input, .settings-panel select').forEach(inp=>{inp.oninput=()=>{const row=inp.closest('.row');if(row){const v=row.querySelector('.val');if(v){if(inp.type==='color')v.textContent=inp.value;else if(inp.id==='rDimFont')v.textContent=inp.value+'px';else if(inp.id==='rScale')v.textContent=(inp.value/100).toFixed(2);else if(inp.id==='rDimTick')v.textContent=inp.value;else if(inp.id==='rDimLine')v.textContent=(inp.value/10).toFixed(1);else if(inp.id&&inp.id.startsWith('r')&&inp.id.endsWith('Font'))v.textContent=inp.value+'px';}}}});
+document.getElementById('settingsOverlay').onclick=e=>{if(e.target===e.currentTarget){e.currentTarget.classList.remove('open');readFromUI();render();}};
+loadSettings();
+
+// ─── Parser ───────────────────────────────────────────────────────────────
+function parseCDT(text){
+  const fr={W:0,H:0,D:0,elements:[],openings:[],labels:[],nails:[],subs:[]};
+  let inSub=null,robPts=[],robActive=false;
+  function addEl(el){(inSub?inSub.elements:fr.elements).push(el);}
+  // parse WxH from label: "...:WxH=45x140:..." → {cw:45, cd:140}
+  function parseWxH(fields){
+    for(let i=7;i<fields.length;i++){const m=(fields[i]||'').match(/WxH=(\d+)x(\d+)/);if(m)return{cw:+m[1],cd:+m[2]};}
+    return null;
+  }
+  function parseL(fields){
+    for(let i=7;i<fields.length;i++){const m=(fields[i]||'').match(/L=(\d+)/);if(m)return+m[1];}
+    return null;
+  }
+  text.trim().split('\n').forEach(raw=>{
+    const line=raw.trim().replace(/;$/,'');if(!line)return;const f=line.split(':'),tag=f[0];
+    if(tag==='ELM'){fr.W=+f[1];fr.H=+f[2];fr.D=+f[3]||140;}
+    else if(tag==='BS'||tag==='TS'){const wxh=parseWxH(f),ll=parseL(f);addEl({type:'plate',subType:tag==='BS'?'bottom':'top',x:+f[4],y:+f[5],z:0,w:+f[1],h:+f[2],d:+f[3],label:f[7]||tag,cw:wxh?wxh.cw:+f[1],cd:wxh?wxh.cd:+f[3],len:ll||+f[1]});}
+    else if(tag==='ST'){const wxh=parseWxH(f),ll=parseL(f);addEl({type:'stud',x:+f[4],y:+f[5],z:+f[6]||0,w:+f[1],h:+f[2],d:+f[3],label:f[7]||'Stud',cw:wxh?wxh.cw:+f[1],cd:wxh?wxh.cd:+f[3],len:ll||+f[2]});}
+    else if(tag==='STL'){const lb=f[7]||'';const lbl=lb.toLowerCase();const wxh=parseWxH(f),ll=parseL(f);
+      if(lbl.includes('block')){addEl({type:'stud',x:+f[4],y:+f[5],z:+f[6]||0,w:+f[1],h:+f[2],d:+f[3],label:lb,cw:wxh?wxh.cw:+f[3],cd:wxh?wxh.cd:+f[2],len:ll||+f[1]});}
+      else{addEl({type:lbl.includes('sill')?'sill':'header',x:+f[4],y:+f[5],z:+f[6]||0,w:+f[1],h:+f[2],d:+f[3],label:lb,cw:wxh?wxh.cw:+f[3],cd:wxh?wxh.cd:+f[2],len:ll||+f[1]});}}
+    else if(tag.startsWith('BOI')||tag.startsWith('BOO'))addEl({type:'sheet',subType:tag,x:+f[4],y:+f[5],z:0,w:+f[1],h:+f[2],d:+f[3],label:f[8]||tag,cw:0,cd:0,len:0});
+    else if(tag==='SUB')inSub={x:+f[4],y:+f[5],z:0,w:+f[1],h:+f[2],d:+f[3],elements:[],openings:[],uuid:f[7]};
+    else if(tag==='SUE'){if(inSub){fr.subs.push(inSub);inSub=null;}}
+    else if(tag==='ROB'){robActive=true;robPts=[{x:+f[1],y:+f[2]}];}
+    else if(tag==='RL'&&robActive)robPts.push({x:+f[1],y:+f[2]});
+    else if(tag==='ROE'){if(robPts.length>=3)(inSub?inSub.openings:fr.openings).push([...robPts]);robPts=[];robActive=false;}
+    else if(tag==='FST')fr.nails.push({x1:+f[1],y1:+f[2],z1:+f[3],x2:+f[4],y2:+f[5],z2:+f[6]});
+    else if(tag==='INK')fr.labels.push({x:+f[1],y:+f[2],z:0,text:f[4]||''});
+  });
+  return fr;
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+function projectBox(el,v){if(v==='front')return{x:el.x,y:el.y,w:el.w,h:el.h};if(v==='top')return{x:el.x,y:el.z,w:el.w,h:el.d};if(v==='side')return{x:el.z,y:el.y,w:el.d,h:el.h};}
+function makeT(v,cfg,ox,oy){const{PAD,scale:sc,W,H,D}=cfg;if(v==='front')return{tx:x=>ox+PAD+x*sc,ty:y=>oy+PAD+(H-y)*sc,ts:v2=>v2*sc};if(v==='top')return{tx:x=>ox+PAD+x*sc,ty:z=>oy+PAD+(D-z)*sc,ts:v2=>v2*sc};if(v==='side')return{tx:z=>ox+PAD+z*sc,ty:y=>oy+PAD+(H-y)*sc,ts:v2=>v2*sc};}
+function makeInv(v,cfg,ox,oy){const{PAD,scale:sc,H,D}=cfg;if(v==='front')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>H-((sy-oy-PAD)/sc)};if(v==='top')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>D-((sy-oy-PAD)/sc)};if(v==='side')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>H-((sy-oy-PAD)/sc)};}
+function sortV(els,v){return[...els].sort((a,b)=>{if(v==='front')return(a.z+a.d)-(b.z+b.d);if(v==='top')return(a.y+a.h)-(b.y+b.h);if(v==='side')return(a.x+a.w)-(b.x+b.w);return 0;});}
+function studType(label){const l=(label||'').toLowerCase();if(l.includes('king'))return'King Stud';if(l.includes('jackov'))return'Jack (over)';if(l.includes('jackund'))return'Jack (under)';if(l.includes('jack'))return'Jack Stud';if(l.includes('left')||l.includes('right'))return'End Stud';return'Stud';}
+
+// ─── Colours ──────────────────────────────────────────────────────────────
+const SUB_COLORS=['cSub0','cSub1','cSub2','cSub3'];
+function elColor(el){if(S.subColour&&el._subIdx!==undefined)return S[SUB_COLORS[el._subIdx%4]];if(el.type==='sheet')return S.cSheet;return{stud:S.cStud,plate:S.cPlate,header:S.cHeader,sill:S.cSill}[el.type]||'#ccc';}
+
+// ─── Draw ─────────────────────────────────────────────────────────────────
+function drawBox(g,el,view,t){const p=projectBox(el,view);const x=t.tx(p.x),y=t.ty(p.y+p.h),w=t.ts(p.w),h=t.ts(p.h);if(w<0.3||h<0.3)return;const r=mkEl('rect',{x,y,width:w,height:h,fill:elColor(el),stroke:'#222','stroke-width':0.5,opacity:el.type==='sheet'?0.35:1},g);const title=document.createElementNS(NS,'title');title.textContent=`${el.label||el.type} ${el.cw}×${el.cd} L=${el.len} @ (${el.x},${el.y})`;r.appendChild(title);if(el._subIdx!==undefined)r.dataset.subIdx=el._subIdx;}
+function drawEls(g,els,v,t){els.forEach(el=>drawBox(g,el,v,t));}
+function drawOpenings(g,openings,t){openings.forEach(poly=>{mkEl('polygon',{points:poly.map(p=>`${t.tx(p.x)},${t.ty(p.y)}`).join(' '),fill:'none',stroke:S.cOpening,'stroke-width':1},g);});}
+function drawNails(g,nails,t){nails.forEach(n=>mkEl('circle',{cx:t.tx(n.x1),cy:t.ty(n.y1),r:1.5,fill:'red',opacity:0.6},g));}
+
+// ─── Dimension helpers (use settings) ─────────────────────────────────────
+function DC(){return S.cDim;}function DF(){return S.dimFont+'px';}function DLW(){return S.dimLine/10;}function DTK(){return S.dimTick;}function DEX(){return S.dimExt==='none'?undefined:S.dimExt;}
+function dimLbl(g,x,y,label){const fs=S.dimFont,tw=Math.max(label.length*(fs*0.58),14);mkEl('rect',{x:x-tw/2,y:y-fs/2-1,width:tw,height:fs+2,rx:2,fill:'#fafafa',stroke:DC(),'stroke-width':0.3},g);mkEl('text',{x,y:y+fs*0.35,fill:DC(),'font-size':DF(),'text-anchor':'middle','font-family':'monospace'},g).textContent=label;}
+function drawDimH(g,sx1,sx2,sy,off,label){
+  const y=sy+off,tk=DTK(),lw=DLW(),ext=DEX();
+  mkEl('line',{x1:sx1,y1:y,x2:sx2,y2:y,stroke:DC(),'stroke-width':lw},g);
+  mkEl('line',{x1:sx1,y1:y-tk,x2:sx1,y2:y+tk,stroke:DC(),'stroke-width':lw},g);
+  mkEl('line',{x1:sx2,y1:y-tk,x2:sx2,y2:y+tk,stroke:DC(),'stroke-width':lw},g);
+  const ea={x1:sx1,y1:sy,x2:sx1,y2:y,stroke:DC(),'stroke-width':lw*0.6};if(ext)ea['stroke-dasharray']=ext;mkEl('line',ea,g);
+  const eb={x1:sx2,y1:sy,x2:sx2,y2:y,stroke:DC(),'stroke-width':lw*0.6};if(ext)eb['stroke-dasharray']=ext;mkEl('line',eb,g);
+  dimLbl(g,(sx1+sx2)/2,y,label);
+}
+function drawDimV(g,sy1,sy2,sx,off,label){
+  const x=sx+off,top=Math.min(sy1,sy2),bot=Math.max(sy1,sy2),tk=DTK(),lw=DLW(),ext=DEX();
+  mkEl('line',{x1:x,y1:top,x2:x,y2:bot,stroke:DC(),'stroke-width':lw},g);
+  mkEl('line',{x1:x-tk,y1:top,x2:x+tk,y2:top,stroke:DC(),'stroke-width':lw},g);
+  mkEl('line',{x1:x-tk,y1:bot,x2:x+tk,y2:bot,stroke:DC(),'stroke-width':lw},g);
+  const ea={x1:sx,y1:top,x2:x,y2:top,stroke:DC(),'stroke-width':lw*0.6};if(ext)ea['stroke-dasharray']=ext;mkEl('line',ea,g);
+  const eb={x1:sx,y1:bot,x2:x,y2:bot,stroke:DC(),'stroke-width':lw*0.6};if(ext)eb['stroke-dasharray']=ext;mkEl('line',eb,g);
+  dimLbl(g,x,(top+bot)/2,label);
+}
+
+// ─── Chain dims — simple: dimension between each stud right-edge to next left-edge ──
+// Adjacent studs (gap < 5mm) are merged into one block, labeled as combined width
+function drawChainDims(g,elements,t){
+  const studs=elements.filter(e=>e.type==='stud').sort((a,b)=>a.x-b.x);
+  if(studs.length<2)return;
+
+  // Build blocks: each block is {left, right} in mm
+  // Merge studs that touch or overlap (right edge >= next left edge - 2)
+  const blocks=[];
+  let curL=studs[0].x, curR=studs[0].x+studs[0].w, curN=1;
+  for(let i=1;i<studs.length;i++){
+    const sl=studs[i].x, sr=studs[i].x+studs[i].w;
+    if(sl <= curR+2){ // touching or overlapping
+      curR=Math.max(curR,sr);
+      curN++;
+    } else {
+      blocks.push({l:curL, r:curR, n:curN});
+      curL=sl; curR=sr; curN=1;
+    }
+  }
+  blocks.push({l:curL, r:curR, n:curN});
+
+  const yA=t.ty(0);
+  const baseOff=Math.max(18,S.chainOff1);
+  const rowGap=Math.max(14,S.dimFont+6);
+  const rows=[];
+  function labelWidth(label){return Math.max(label.length*(S.dimFont*0.62),18)+8;}
+  function placeRow(cx,lbl){
+    const half=labelWidth(lbl)/2;
+    const span={l:cx-half,r:cx+half};
+    let row=0;
+    while(rows[row]&&rows[row].some(s=>!(span.r<s.l||span.l>s.r)))row++;
+    if(!rows[row])rows[row]=[];
+    rows[row].push(span);
+    return row;
+  }
+
+  // Dimension gaps between blocks, assigning as many rows as needed.
+  for(let i=0;i<blocks.length-1;i++){
+    const gapMM=Math.round(blocks[i+1].l - blocks[i].r);
+    if(gapMM>2){
+      const sx1=t.tx(blocks[i].r),sx2=t.tx(blocks[i+1].l),lbl=gapMM+'';
+      const row=placeRow((sx1+sx2)/2,lbl);
+      drawDimH(g,sx1,sx2,yA,baseOff+row*rowGap,lbl);
+    }
+  }
+
+  // Label merged blocks (2+ studs) with combined width only.
+  blocks.forEach(b=>{
+    if(b.n>1){
+      const bw=Math.round(b.r-b.l);
+      const sx1=t.tx(b.l),sx2=t.tx(b.r),lbl=bw+'';
+      const row=placeRow((sx1+sx2)/2,lbl);
+      drawDimH(g,sx1,sx2,yA,baseOff+row*rowGap,lbl);
+    }
+  });
+}
+
+// ─── Origin dims: distance from x=0 to outside (right) edge of each stud cluster ──
+// Uses studs sitting on/near bottom plate (under studs), not over studs
+function drawOriginDims(g,elements,t){
+  // filter to studs whose y is near the bottom plate (y < 100, ie sitting on plate)
+  const underStuds=elements.filter(e=>e.type==='stud'&&e.y<100).sort((a,b)=>a.x-b.x);
+  if(!underStuds.length)return;
+
+  // Build clusters: merge studs that touch or overlap
+  const blocks=[];
+  let curL=underStuds[0].x, curR=underStuds[0].x+underStuds[0].w;
+  for(let i=1;i<underStuds.length;i++){
+    const sl=underStuds[i].x, sr=underStuds[i].x+underStuds[i].w;
+    if(sl<=curR+2){ curR=Math.max(curR,sr); }
+    else { blocks.push({l:curL,r:curR}); curL=sl; curR=sr; }
+  }
+  blocks.push({l:curL,r:curR});
+
+  const fs=S.dimFont;
+  const lw=DLW();
+  const ext=DEX();
+  const yBase=t.ty(0);
+  const baseOff=14; // tight below frame
+
+  blocks.forEach(b=>{
+    const rx=Math.round(b.r);
+    const sx=t.tx(rx);
+    const labelY=yBase+baseOff+fs;
+
+    // dashed line from bottom of frame down to label
+    const lineAttrs={x1:sx,y1:yBase+2,x2:sx,y2:labelY-fs,stroke:DC(),'stroke-width':lw*0.6};
+    if(ext)lineAttrs['stroke-dasharray']=ext;
+    mkEl('line',lineAttrs,g);
+
+    // small tick
+    mkEl('line',{x1:sx-2,y1:labelY-fs,x2:sx+2,y2:labelY-fs,stroke:DC(),'stroke-width':lw},g);
+
+    // label
+    mkEl('text',{x:sx,y:labelY,fill:DC(),'font-size':fs+'px','text-anchor':'middle','font-family':'monospace'},g).textContent=rx+'';
+  });
+}
+
+function drawStudPositionDims(g,elements,t){
+  const studs=elements.filter(e=>e.type==='stud'&&e.y<100).sort((a,b)=>a.x-b.x);
+  if(!studs.length)return;
+  const blocks=[];
+  let curL=studs[0].x,curR=studs[0].x+studs[0].w,curN=1;
+  for(let i=1;i<studs.length;i++){
+    const sl=studs[i].x,sr=studs[i].x+studs[i].w;
+    if(sl<=curR+2){curR=Math.max(curR,sr);curN++;}
+    else{blocks.push({l:curL,r:curR,n:curN});curL=sl;curR=sr;curN=1;}
+  }
+  blocks.push({l:curL,r:curR,n:curN});
+
+  const fs=S.dimFont,lw=DLW(),ext=DEX(),yBase=t.ty(0);
+  const rows=[],rowGap=Math.max(14,fs+6),baseOff=18;
+  function labelWidth(label){return Math.max(label.length*(fs*0.6),18)+6;}
+  function placeRow(cx,lbl){
+    const half=labelWidth(lbl)/2,span={l:cx-half,r:cx+half};
+    let row=0;
+    while(rows[row]&&rows[row].some(s=>!(span.r<s.l||span.l>s.r)))row++;
+    if(!rows[row])rows[row]=[];
+    rows[row].push(span);
+    return row;
+  }
+  blocks.forEach(b=>{
+    const lbl=Math.round(b.r)+'',sx=t.tx(b.r);
+    const row=placeRow(sx,lbl),labelY=yBase+baseOff+row*rowGap;
+    const attrs={x1:sx,y1:yBase+2,x2:sx,y2:labelY-fs-2,stroke:DC(),'stroke-width':lw*0.6};
+    if(ext)attrs['stroke-dasharray']=ext;
+    mkEl('line',attrs,g);
+    mkEl('line',{x1:sx-2,y1:labelY-fs-2,x2:sx+2,y2:labelY-fs-2,stroke:DC(),'stroke-width':lw},g);
+    mkEl('text',{x:sx,y:labelY,fill:DC(),'font-size':fs+'px','text-anchor':'middle','font-family':'monospace'},g).textContent=lbl;
+    if(b.n>1){
+      mkEl('text',{x:t.tx((b.l+b.r)/2),y:t.ty(0)-4,fill:'#333','font-size':Math.max(7,fs-1)+'px','text-anchor':'middle','font-family':'monospace'},g).textContent=b.n+'nr';
+    }
+  });
+}
+
+// ─── Spec label positioning helper ────────────────────────────────────────
+function placeSpecLabel(g,el,text,fontKey,orientKey,placeKey,offKey,t){
+  const fs=S[fontKey],orient=+S[orientKey],place=S[placeKey],off=S[offKey];
+  // element centre in screen coords
+  let sx=t.tx(el.x+el.w/2), sy=t.ty(el.y+el.h/2);
+  // adjust placement
+  if(place==='above'){sy=t.ty(el.y+el.h)-fs-2;}
+  else if(place==='below'){sy=t.ty(el.y)+fs+2;}
+  else if(place==='left'){sx=t.tx(el.x)-4;} 
+  else if(place==='right'){sx=t.tx(el.x+el.w)+4;}
+  // apply offset
+  sy+=off;
+  const attrs={x:sx,y:sy,fill:'#333','font-size':fs+'px','font-family':'monospace','font-weight':'bold'};
+  if(place==='left')attrs['text-anchor']='end';
+  else if(place==='right')attrs['text-anchor']='start';
+  else attrs['text-anchor']='middle';
+  if(orient!==0)attrs.transform=`rotate(${orient},${sx},${sy})`;
+  mkEl('text',attrs,g).textContent=text;
+}
+
+// ─── Spec labels ──────────────────────────────────────────────────────────
+function drawSpecLabels(g,elements,t){
+  // headers — format: qty/WxH L=len @ y
+  const headers=elements.filter(e=>e.type==='header');
+  if(headers.length){
+    const byY={};headers.forEach(h=>{const k=Math.round(h.y);if(!byY[k])byY[k]=[];byY[k].push(h);});
+    Object.values(byY).forEach(grp=>{
+      const e=grp[0];const lbl=`${grp.length}/${e.cw}×${e.cd} L=${e.len} @ ${Math.round(e.y)}`;
+      placeSpecLabel(g,{x:e.x,y:e.y,w:e.w,h:e.h},lbl,'hdrFont','hdrOrient','hdrPlace','hdrOff',t);
+    });
+  }
+  // sills
+  const sills=elements.filter(e=>e.type==='sill');
+  if(sills.length){
+    const byY={};sills.forEach(s=>{const k=Math.round(s.y);if(!byY[k])byY[k]=[];byY[k].push(s);});
+    Object.values(byY).forEach(grp=>{
+      const e=grp[0];const lbl=`${grp.length}/${e.cw}×${e.cd} L=${e.len} @ ${Math.round(e.y)}`;
+      placeSpecLabel(g,{x:e.x,y:e.y,w:e.w,h:e.h},lbl,'sillFont','sillOrient','sillPlace','sillOff',t);
+    });
+  }
+  // (jack over/under labels removed — not shown in specs)
+}
+
+// ─── Clear opening dims (frame only — studs/headers/sills, not sheets) ───
+function calcClearOpening(elements){
+  // find opening bounds from jack studs, headers, sills
+  const overs=elements.filter(e=>e.type==='stud'&&(e.label||'').toLowerCase().includes('jackov'));
+  const unders=elements.filter(e=>e.type==='stud'&&(e.label||'').toLowerCase().includes('jackund'));
+  const headers=elements.filter(e=>e.type==='header');
+  const sills=elements.filter(e=>e.type==='sill');
+  if(!overs.length&&!headers.length)return[];
+  // clear width = distance between innermost jacks
+  const allJacks=[...overs,...unders];
+  if(allJacks.length<2&&headers.length===0)return[];
+  // use header span for width
+  let minX,maxX,minY,maxY;
+  if(headers.length){
+    const h=headers[0];
+    minX=h.x;maxX=h.x+h.w;// header spans the opening width (inner studs to inner studs typically)
+    maxY=h.y;// bottom of header = top of clear opening
+  }
+  if(sills.length){
+    const s=sills[0];
+    minY=s.y+s.h;// top of sill = bottom of clear opening
+    if(!minX){minX=s.x;maxX=s.x+s.w;}
+  }
+  if(!minY)minY=0;if(!maxY){if(overs.length)maxY=overs[0].y;else return[];}
+  if(minX===undefined)return[];
+  return[{x:minX,y:minY,w:maxX-minX,h:maxY-minY}];
+}
+
+function drawOpeningCentreDims(g,elements,t){
+  const opens=calcClearOpening(elements);
+  opens.forEach(o=>{
+    const cx=o.x+o.w/2, cy=o.y+o.h/2;
+    const fs=S.dimFont+1;
+    mkEl('text',{x:t.tx(cx),y:t.ty(cy)-2,fill:S.cOpening,'font-size':fs+'px','text-anchor':'middle','font-family':'monospace','font-weight':'bold'},g).textContent=`${Math.round(o.w)} × ${Math.round(o.h)}`;
+  });
+}
+
+function drawSubRefs(g,subs,t,viewBox){
+  const rows=[],rowGap=16,labelH=14,labelW=46;
+  const minX=viewBox.x+36,maxX=viewBox.x+viewBox.w-36;
+  const baseY=t.ty(viewBox.realH)-24;
+  const refs=subs.map((sub,si)=>({
+    sub,si,
+    cx:t.tx(sub.x+sub.w/2),
+    top:t.ty(sub.y+sub.h),
+    label:'SUB '+(si+1),
+    col:S.subColour?S[SUB_COLORS[si%4]]:DC()
+  })).sort((a,b)=>a.cx-b.cx);
+  refs.forEach(ref=>{
+    let x=Math.max(minX,Math.min(maxX,ref.cx));
+    let row=0,span;
+    do{
+      span={l:x-labelW/2,r:x+labelW/2};
+      if(!rows[row])rows[row]=[];
+      if(!rows[row].some(s=>!(span.r<s.l||span.l>s.r)))break;
+      row++;
+    }while(row<8);
+    rows[row].push(span);
+    const y=baseY-row*rowGap;
+    if(Math.abs(x-ref.cx)>4||row>0){
+      mkEl('line',{x1:ref.cx,y1:ref.top-4,x2:x,y2:y+4,stroke:ref.col,'stroke-width':0.8,'stroke-dasharray':'2,2','pointer-events':'none'},g);
+    }
+    mkEl('rect',{x:x-labelW/2,y:y-labelH+3,width:labelW,height:labelH,rx:3,fill:'#fafafa',stroke:ref.col,'stroke-width':0.8,'pointer-events':'none'},g);
+    mkEl('text',{x,y,fill:ref.col,'font-size':'10px','text-anchor':'middle','font-family':'sans-serif','font-weight':'bold','pointer-events':'none'},g).textContent=ref.label;
+  });
+}
+
+// ─── Sub dims (respects toggles) ─────────────────────────────────────────
+function drawSubDims(g,elements,t,opts){
+  if(!opts.showDims) return;
+  const minX=Math.min(...elements.map(e=>e.x));
+  const maxX=Math.max(...elements.map(e=>e.x+e.w));
+  const minY=Math.min(...elements.map(e=>e.y));
+  const maxY=Math.max(...elements.map(e=>e.y+e.h));
+  const rightEdge=t.tx(maxX);
+  drawDimH(g,t.tx(minX),t.tx(maxX),t.ty(minY),26,Math.round(maxX-minX)+'');
+  drawDimV(g,t.ty(maxY),t.ty(minY),t.tx(minX),-18,Math.round(maxY-minY)+'');
+  const headers=elements.filter(e=>e.type==='header');
+  if(headers.length){const h=headers[0];drawDimV(g,t.ty(h.y+h.h),t.ty(h.y),rightEdge,16,Math.round(h.h)+' hdr');}
+  const sills=elements.filter(e=>e.type==='sill');
+  if(sills.length){const s=sills[0];drawDimV(g,t.ty(s.y+s.h),t.ty(s.y),rightEdge,34,Math.round(s.h)+' sill');}
+  const studs=elements.filter(e=>e.type==='stud');
+  if(studs.length){
+    mkEl('text',{x:t.tx((minX+maxX)/2),y:t.ty(minY)-6,fill:'#333','font-size':'10px','text-anchor':'middle','font-family':'monospace'},g).textContent=studs.length+'nr';
+  }
+}
+
+// ─── Snap / Measure ──────────────────────────────────────────────────────
+function buildSnaps(els){
+  const pts=[];
+  els.forEach(el=>{
+    const x1=el.x,x2=el.x+el.w,y1=el.y,y2=el.y+el.h,cx=(x1+x2)/2,cy=(y1+y2)/2;
+    pts.push({x:x1,y:y1},{x:x2,y:y1},{x:x1,y:y2},{x:x2,y:y2},{x:cx,y:y1},{x:cx,y:y2},{x:x1,y:cy},{x:x2,y:cy},{x:cx,y:cy});
+  });
+  return pts;
+}
+function snapPt(pt,spts,tol){
+  let best=null,bestD=tol||60;
+  spts.forEach(p=>{const d=Math.hypot(p.x-pt.x,p.y-pt.y);if(d<bestD){bestD=d;best=p;}});
+  return best?{...best,snapped:true}:pt;
+}
+function drawMeasureLine(g,sx1,sy1,sx2,sy2,label){const mc=S.cMeasure;mkEl('line',{x1:sx1,y1:sy1,x2:sx2,y2:sy2,stroke:mc,'stroke-width':1.5,'stroke-dasharray':'4,3'},g);mkEl('circle',{cx:sx1,cy:sy1,r:3,fill:mc},g);mkEl('circle',{cx:sx2,cy:sy2,r:3,fill:mc},g);const mx=(sx1+sx2)/2,my=(sy1+sy2)/2,tw=Math.max(label.length*6,36);mkEl('rect',{x:mx-tw/2,y:my-8,width:tw,height:14,rx:3,fill:mc},g);mkEl('text',{x:mx,y:my+3,fill:'#fff','font-size':'10px','text-anchor':'middle','font-family':'monospace','font-weight':'bold'},g).textContent=label;}
+
+// ─── Cut list (uses cw, cd, len from WxH and L= in CDT) ──────────────────
+function buildCutList(elements){
+  const groups={};
+  elements.forEach(el=>{
+    if(el.type==='sheet')return;
+    let typeName;
+    if(el.type==='plate')typeName=el.subType==='bottom'?'Bottom Plate':'Top Plate';
+    else if(el.type==='header')typeName='Header';
+    else if(el.type==='sill')typeName='Sill';
+    else if(el.type==='stud')typeName=studType(el.label);
+    else typeName=el.type;
+    const dim=`${el.cd}×${el.cw}`;
+    const len=el.len;
+    const key=`${typeName}|${dim}|${len}`;
+    if(!groups[key])groups[key]={type:typeName,dim,len,qty:0};
+    groups[key].qty++;
+  });
+  return Object.values(groups).sort((a,b)=>a.type.localeCompare(b.type)||b.len-a.len);
+}
+function renderCutList(elements){
+  const cl=document.getElementById('cutlist');const items=buildCutList(elements);
+  const showCutList=document.getElementById('chkCutList').checked;
+  cl.classList.toggle('hidden',!showCutList);
+  if(!showCutList){cl.innerHTML='';return;}
+  let html=`<h4>Timber Cut List ${cutListCollapsed?'▸':'▾'}</h4><table><tr><th>Type</th><th>Size</th><th>Len</th><th>Qty</th></tr>`;
+  items.forEach(it=>{html+=`<tr><td>${it.type}</td><td>${it.dim}</td><td>${it.len}</td><td>${it.qty}</td></tr>`;});
+  html+='</table>';cl.innerHTML=html;
+  cl.classList.toggle('collapsed',cutListCollapsed);
+  const head=cl.querySelector('h4');
+  head.onclick=e=>{e.stopPropagation();if(cutListDidDrag){cutListDidDrag=false;return;}cutListCollapsed=!cutListCollapsed;renderCutList(elements);};
+  head.onmousedown=e=>{cutListDrag={x:e.clientX,y:e.clientY,left:cl.offsetLeft,top:cl.offsetTop};cutListDidDrag=false;e.preventDefault();};
+}
+
+// ─── Parse & setup ────────────────────────────────────────────────────────
+const builtInFr=parseCDT(RAW);
+const fr=parseCDT(RAW);const svgEl=document.getElementById('svg');
+let cutListCollapsed=false;
+let cutListDrag=null,cutListDidDrag=false,cutListCustomPos=false;
+let svgView={x:0,y:0,w:0,h:0,baseW:0,baseH:0};
+function applySvgView(){svgEl.setAttribute('viewBox',`${svgView.x} ${svgView.y} ${svgView.w} ${svgView.h}`);}
+function resetSvgView(totalW,totalH){svgView={x:0,y:0,w:totalW,h:totalH,baseW:totalW,baseH:totalH};applySvgView();}
+
+let activeTab='all';
+function buildTabs(){
+  const tabsEl=document.getElementById('tabs');tabsEl.innerHTML='';
+  const mk=(id,label,dot)=>{const t=document.createElement('div');t.className='tab'+(activeTab===id?' active':'');
+    if(dot)t.innerHTML=`<span class="dot" style="background:${dot}"></span>`+label;else t.textContent=label;
+    t.onclick=()=>{activeProductionKey=null;activeTab=id;buildTabs();render();};tabsEl.appendChild(t);};
+  mk('all','Full Panel');
+  fr.subs.forEach((s,i)=>{const hasO=s.elements.some(e=>e.type==='header'||e.type==='sill');const col=S.subColour?S[SUB_COLORS[i%4]]:(hasO?S.cOpening:S.cStud);mk(''+i,`Sub ${i+1}${hasO?' ◻':''}`,col);});
+}
+buildTabs();
+function selectSub(idx){activeProductionKey=null;activeTab=''+idx;buildTabs();render();}
+
+function mirrorElementsForBack(els,W){
+  return els.map(e=>({...e,x:W-e.x-e.w}));
+}
+function mirrorOpeningsForBack(openings,W){
+  return openings.map(poly=>poly.map(pt=>({...pt,x:W-pt.x})));
+}
+function mirrorSubsForBack(subs,W){
+  return subs.map(s=>({...s,x:W-s.x-s.w}));
+}
+
+// ─── Render ───────────────────────────────────────────────────────────────
+let viewRegions=[];
+function render(){
+  svgEl.innerHTML='';viewRegions=[];
+  const showF=document.getElementById('chkFront').checked,showT=document.getElementById('chkTop').checked,showS=document.getElementById('chkSide').checked;
+  const showBack=document.getElementById('chkBackView').checked;
+  const showDims=document.getElementById('chkDims').checked,showStudDims=document.getElementById('chkStudDims').checked,showOpenDims=document.getElementById('chkOpenDims').checked;
+  const showSpecs=document.getElementById('chkSpecs').checked,showRouting=document.getElementById('chkRouting').checked;
+  const showNails=document.getElementById('chkNails').checked,showSheets=document.getElementById('chkSheets').checked;
+  const showOriginDims=document.getElementById('chkOriginDims').checked;
+  const subIdx=activeTab;
+  let elements,openings,W,H,D,isSubView=false;
+  if(subIdx==='all'){
+    elements=[...fr.elements];fr.subs.forEach((s,si)=>{s.elements.forEach(e=>{elements.push({...e,_subIdx:si});});});
+    openings=[...fr.openings,...fr.subs.flatMap(s=>s.openings)];W=fr.W;H=fr.H;D=fr.D;
+  } else {
+    const si=+subIdx,sub=fr.subs[si],rawEls=sub.elements,rawOpen=sub.openings;
+    const xs=rawEls.map(e=>e.x),ys=rawEls.map(e=>e.y),zs=rawEls.map(e=>e.z||0);
+    const xe=rawEls.map(e=>e.x+e.w),ye=rawEls.map(e=>e.y+e.h),ze=rawEls.map(e=>(e.z||0)+e.d);
+    const mnX=Math.min(...xs),mnY=Math.min(...ys),mnZ=Math.min(...zs);
+    W=Math.max(...xe)-mnX;H=Math.max(...ye)-mnY;D=Math.max(...ze)-mnZ||fr.D;
+    elements=rawEls.map(e=>({...e,x:e.x-mnX,y:e.y-mnY,z:(e.z||0)-mnZ}));
+    openings=rawOpen.map(p=>p.map(pt=>({x:pt.x-mnX,y:pt.y-mnY})));isSubView=true;
+  }
+  const displaySubs=subIdx==='all'?(showBack?mirrorSubsForBack(fr.subs,W):fr.subs):[];
+  if(showBack){
+    elements=mirrorElementsForBack(elements,W);
+    openings=mirrorOpeningsForBack(openings,W);
+  }
+  const snapPts=buildSnaps(elements);const scale=S.scale/100;const cfg={W,H,D,scale,PAD:(isSubView?64:(showStudDims?78:50))};const gap=10;
+  const frontW=cfg.W*scale+cfg.PAD*2,frontH=cfg.H*scale+cfg.PAD*2;const topH=cfg.D*scale+cfg.PAD*2,sideW=cfg.D*scale+cfg.PAD*2;
+  let totalW=0,totalH=0;
+  if(showF){totalW=frontW;totalH=frontH;}
+  if(showS){totalW=(showF?frontW+gap:0)+sideW;totalH=Math.max(totalH,frontH);}
+  if(showT){totalH=(showF?frontH:(showS?frontH:0))+gap+topH;totalW=Math.max(totalW,frontW);}
+  if(!showF&&!showT&&!showS){totalW=200;totalH=40;}
+  if(isSubView){totalW+=80;totalH+=50;}
+  if(showOriginDims){totalH+=40;}
+  svgEl.setAttribute('width',totalW);svgEl.setAttribute('height',totalH);
+  resetSvgView(totalW,totalH);
+  const frontOx=0,frontOy=0,sideOx=frontW+gap,sideOy=0,topOx=0,topOy=(showF?frontH:(showS?frontH:0))+gap;
+  const cl=document.getElementById('cutlist');
+  const cutLeft=showS?sideOx:(showF?frontW+gap:10);
+  const cutTop=showT?topOy:(showF?frontH+gap:10);
+  if(!cutListCustomPos){
+    cl.style.left=Math.round(cutLeft)+'px';
+    cl.style.top=Math.round(cutTop)+'px';
+  }
+
+  function doView(view,ox,oy,pxW,pxH){
+    const t=makeT(view,cfg,ox,oy),inv=makeInv(view,cfg,ox,oy);const g=mkEl('g',{},svgEl);
+    let label=view.toUpperCase();if(view==='front'&&showBack)label='BACK';if(view==='top')label='TOP (plates hidden)';if(isSubView)label+=' — Sub '+(+subIdx+1);
+    mkEl('text',{x:ox+10,y:oy+15},svgEl).textContent=label;
+    let list=[...elements];if(view==='top')list=list.filter(e=>e.type!=='plate');if(!showSheets)list=list.filter(e=>e.type!=='sheet');
+    drawEls(g,sortV(list,view),view,t);
+    if(showRouting&&view==='front')drawOpenings(g,openings,t);
+    if(showOpenDims&&view==='front'&&!isSubView)drawOpeningCentreDims(mkEl('g',{},svgEl),elements,t);
+    if(showNails&&view==='front'&&subIdx==='all')drawNails(g,fr.nails,t);
+    if(showDims&&!isSubView){const gD=mkEl('g',{},svgEl);
+      if(view==='front'){drawDimV(gD,t.ty(H),t.ty(0),t.tx(0),-16,H+'');}
+      else if(view==='top'){drawDimH(gD,t.tx(0),t.tx(W),t.ty(0),12,W+'');drawDimV(gD,t.ty(D),t.ty(0),t.tx(0),-12,D+'');}
+      else if(view==='side'){drawDimH(gD,t.tx(0),t.tx(D),t.ty(0),12,D+'');drawDimV(gD,t.ty(H),t.ty(0),t.tx(0),-12,H+'');}}
+    if(showStudDims&&view==='front'&&!isSubView){const gC=mkEl('g',{},svgEl);drawDimH(gC,t.tx(0),t.tx(W),t.ty(0),18,W+'');drawChainDims(mkEl('g',{},svgEl),elements,t);}
+    if(showOriginDims&&view==='front')drawOriginDims(mkEl('g',{},svgEl),elements,t);
+    if(showSpecs&&view==='front')drawSpecLabels(mkEl('g',{},svgEl),elements,t);
+    if(isSubView&&view==='front')drawSubDims(mkEl('g',{},svgEl),elements,t,{showDims,showStudDims});
+    if(subIdx==='all'&&view==='front'){
+      displaySubs.forEach((sub,si)=>{
+        const sx=t.tx(sub.x),sy=t.ty(sub.y+sub.h),sw=t.ts(sub.w),sh=t.ts(sub.h);
+        const col=S.subColour?S[SUB_COLORS[si%4]]:DC();
+        const rect=mkEl('rect',{x:sx,y:sy,width:sw,height:sh,fill:S.subColour?(col+'18'):'none',stroke:col,'stroke-width':1,'stroke-dasharray':'6,3',cursor:'pointer'},g);
+        rect.dataset.subIdx=si;
+      });
+      drawSubRefs(mkEl('g',{},svgEl),displaySubs,t,{x:ox,y:oy,w:pxW,h:pxH,realH:H});
+    }
+    viewRegions.push({view,ox,oy,pxW,pxH,t,inv,snapPts});
+  }
+  if(showF)doView('front',frontOx,frontOy,frontW,frontH);
+  if(showS)doView('side',sideOx,sideOy,sideW,frontH);
+  if(showT)doView('top',topOx,topOy,frontW,topH);
+  window._gMeasure=mkEl('g',{},svgEl);
+  window._gSnap=mkEl('g',{},svgEl);
+  renderCutList(elements);
+  updateCurrentBuildPanel();
+}
+
+// ─── Click ────────────────────────────────────────────────────────────────
+let measureActive=false,measureP1=null;
+function hitView(sx,sy){for(const r of viewRegions)if(sx>=r.ox&&sx<=r.ox+r.pxW&&sy>=r.oy&&sy<=r.oy+r.pxH)return r;return null;}
+function drawSnapMarker(region,pt){
+  if(!window._gSnap)window._gSnap=mkEl('g',{},svgEl);
+  window._gSnap.innerHTML='';
+  if(!pt||!pt.snapped)return;
+  mkEl('circle',{cx:region.t.tx(pt.x),cy:region.t.ty(pt.y),r:5,fill:'none',stroke:S.cMeasure,'stroke-width':1.6},window._gSnap);
+  mkEl('line',{x1:region.t.tx(pt.x)-7,y1:region.t.ty(pt.y),x2:region.t.tx(pt.x)+7,y2:region.t.ty(pt.y),stroke:S.cMeasure,'stroke-width':1},window._gSnap);
+  mkEl('line',{x1:region.t.tx(pt.x),y1:region.t.ty(pt.y)-7,x2:region.t.tx(pt.x),y2:region.t.ty(pt.y)+7,stroke:S.cMeasure,'stroke-width':1},window._gSnap);
+}
+svgEl.addEventListener('click',e=>{
+  if(svgDidDrag){svgDidDrag=false;e.preventDefault();return;}
+  const target=e.target;if(!measureActive&&target.dataset&&target.dataset.subIdx!==undefined){selectSub(+target.dataset.subIdx);return;}
+  if(!measureActive)return;const pt=svgEl.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
+  const sp=pt.matrixTransform(svgEl.getScreenCTM().inverse());const region=hitView(sp.x,sp.y);if(!region)return;
+  const real={x:region.inv.ix(sp.x),y:region.inv.iy(sp.y)};const snapped=snapPt(real,region.snapPts,80);const status=document.getElementById('mStatus');
+  drawSnapMarker(region,snapped);
+  if(!measureP1){measureP1={x:snapped.x,y:snapped.y,region};status.textContent=`P1:(${Math.round(snapped.x)},${Math.round(snapped.y)}) [${region.view}] ${snapped.snapped?'snap ':''}→ P2`;}
+  else{if(measureP1.region.view!==region.view){status.textContent='P2 must be same view';measureP1=null;return;}
+    const dx=snapped.x-measureP1.x,dy=snapped.y-measureP1.y,dist=Math.sqrt(dx*dx+dy*dy);
+    drawMeasureLine(window._gMeasure,region.t.tx(measureP1.x),region.t.ty(measureP1.y),region.t.tx(snapped.x),region.t.ty(snapped.y),Math.round(dist)+'mm');
+    status.textContent=`${Math.round(dist)}mm (Δ${Math.round(Math.abs(dx))},${Math.round(Math.abs(dy))}) ${snapped.snapped?'snapped':''}`;measureP1=null;}
+});
+svgEl.addEventListener('mousemove',e=>{
+  if(!measureActive)return;
+  const pt=svgEl.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
+  const sp=pt.matrixTransform(svgEl.getScreenCTM().inverse());const region=hitView(sp.x,sp.y);if(!region)return;
+  const real={x:region.inv.ix(sp.x),y:region.inv.iy(sp.y)};
+  drawSnapMarker(region,snapPt(real,region.snapPts,80));
+});
+
+let svgDrag=null,svgDidDrag=false;
+svgEl.addEventListener('wheel',e=>{
+  if(!svgView.baseW)return;
+  e.preventDefault();
+  const rect=svgEl.getBoundingClientRect();
+  const mx=svgView.x+((e.clientX-rect.left)/rect.width)*svgView.w;
+  const my=svgView.y+((e.clientY-rect.top)/rect.height)*svgView.h;
+  const factor=e.deltaY<0?0.85:1.18;
+  const nextW=Math.min(svgView.baseW*3,Math.max(svgView.baseW/8,svgView.w*factor));
+  const nextH=Math.min(svgView.baseH*3,Math.max(svgView.baseH/8,svgView.h*factor));
+  svgView.x=mx-((e.clientX-rect.left)/rect.width)*nextW;
+  svgView.y=my-((e.clientY-rect.top)/rect.height)*nextH;
+  svgView.w=nextW;svgView.h=nextH;applySvgView();
+},{passive:false});
+svgEl.addEventListener('mousedown',e=>{
+  if(measureActive||e.button!==0)return;
+  svgDrag={x:e.clientX,y:e.clientY,vx:svgView.x,vy:svgView.y};
+  svgDidDrag=false;svgEl.classList.add('panning');e.preventDefault();
+});
+window.addEventListener('mousemove',e=>{
+  if(cutListDrag){
+    const cl=document.getElementById('cutlist');
+    const dx=e.clientX-cutListDrag.x,dy=e.clientY-cutListDrag.y;
+    if(Math.abs(dx)+Math.abs(dy)>3)cutListDidDrag=true;
+    cl.style.left=Math.max(0,cutListDrag.left+dx)+'px';
+    cl.style.top=Math.max(0,cutListDrag.top+dy)+'px';
+    cutListCustomPos=true;
+    return;
+  }
+  if(!svgDrag)return;
+  const rect=svgEl.getBoundingClientRect();
+  const dx=(e.clientX-svgDrag.x)/rect.width*svgView.w;
+  const dy=(e.clientY-svgDrag.y)/rect.height*svgView.h;
+  if(Math.abs(e.clientX-svgDrag.x)+Math.abs(e.clientY-svgDrag.y)>3)svgDidDrag=true;
+  svgView.x=svgDrag.vx-dx;svgView.y=svgDrag.vy-dy;applySvgView();
+});
+window.addEventListener('mouseup',()=>{svgDrag=null;cutListDrag=null;svgEl.classList.remove('panning');});
+
+document.getElementById('btnMeasure').onclick=()=>{measureActive=!measureActive;document.getElementById('btnMeasure').classList.toggle('active',measureActive);svgEl.classList.toggle('measuring',measureActive);document.getElementById('mStatus').textContent=measureActive?'Snap measure: click P1...':'';if(!measureActive){measureP1=null;if(window._gSnap)window._gSnap.innerHTML='';}};
+document.getElementById('btnClear').onclick=()=>{if(window._gMeasure)window._gMeasure.innerHTML='';if(window._gSnap)window._gSnap.innerHTML='';measureP1=null;document.getElementById('mStatus').textContent='';};
+document.getElementById('btnZoomReset').onclick=()=>resetSvgView(svgView.baseW,svgView.baseH);
+['chkFront','chkBackView','chkTop','chkSide','chkDims','chkStudDims','chkOpenDims','chkSpecs','chkRouting','chkNails','chkSheets','chkOriginDims','chkCutList'].forEach(id=>{document.getElementById(id).onchange=render;});
+document.getElementById('btnProduction').onclick=()=>setProductionMode(!productionMode);
+document.getElementById('btnImportList').onclick=()=>document.getElementById('productionInput').click();
+document.getElementById('productionInput').onchange=e=>{
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    productionList=parseCSV(ev.target.result);
+    setProductionMode(true);
+    e.target.value='';
+  };
+  reader.readAsText(file);
+};
+document.getElementById('btnExportRemaining').onclick=()=>{
+  const rows=[['order','panel','sub','size','station','notes']];
+  productionItems().filter(it=>builtStatus[it.key]!=='built').forEach(it=>rows.push([it.order===999999?'':it.order,it.panel,it.subIdx+1,it.size,it.station,it.notes]));
+  downloadCSV('remaining-subs.csv',rows);
+};
+document.getElementById('btnExportLog').onclick=()=>{
+  const rows=[['time','action','sub']];
+  builtLog.forEach(e=>rows.push([e.time,e.action,e.label]));
+  downloadCSV('built-log.csv',rows);
+};
+document.getElementById('btnHideBuilt').onclick=()=>{hideBuilt=!hideBuilt;renderProductionBoard();};
+document.getElementById('btnClearBuilt').onclick=()=>{
+  if(!confirm('Clear all built ticks and log entries?'))return;
+  builtStatus={};builtLog=[];lastBuiltKey=null;saveProductionState();renderProductionBoard();updateCurrentBuildPanel();
+};
+document.getElementById('currentBuildCheck').onchange=e=>{
+  const item=currentProductionItem();
+  if(item)setBuilt(item,e.target.checked,{advance:true});
+};
+
+// ─── File sidebar ─────────────────────────────────────────────────────────
+const sidebar=document.getElementById('sidebar');
+document.getElementById('sidebarToggle').onclick=()=>{sidebar.classList.add('open');document.body.classList.add('sidebar-open');};
+document.getElementById('sidebarClose').onclick=()=>{sidebar.classList.remove('open');document.body.classList.remove('sidebar-open');};
+
+let loadedFiles=[]; // {name, raw, fr}
+let activeFileIdx=-1; // -1 = use built-in RAW
+if(Array.isArray(SAMPLE_CDTS)){
+  loadedFiles=SAMPLE_CDTS.map(s=>({name:s.name,raw:s.raw,fr:parseCDT(s.raw)})).filter(f=>f.fr.W>0);
+}
+
+function renderMiniSvg(frData){
+  // returns an SVG string for a tiny preview (front view only)
+  const sc=0.03,pad=4;
+  const w=frData.W*sc+pad*2, h=frData.H*sc+pad*2;
+  const els=[...frData.elements,...frData.subs.flatMap(s=>s.elements)];
+  let rects='';
+  els.forEach(el=>{
+    if(el.type==='sheet')return;
+    const rx=pad+el.x*sc, ry=pad+(frData.H-el.y-el.h)*sc, rw=el.w*sc, rh=el.h*sc;
+    if(rw<0.2||rh<0.2)return;
+    const c=el.type==='plate'?'#a07840':el.type==='header'?'#d4a44a':el.type==='sill'?'#bfa060':'#c8a26e';
+    rects+=`<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${c}" stroke="#555" stroke-width="0.2"/>`;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${rects}</svg>`;
+}
+
+// ─── Production board ─────────────────────────────────────────────────────
+let productionMode=false;
+let productionList=null;
+let builtStatus={};
+let builtLog=[];
+let activeProductionKey=null;
+let lastBuiltKey=null;
+let hideBuilt=false;
+try{builtStatus=JSON.parse(localStorage.getItem('cdtProductionStatus')||'{}');}catch(e){builtStatus={};}
+try{builtLog=JSON.parse(localStorage.getItem('cdtProductionLog')||'[]');}catch(e){builtLog=[];}
+try{lastBuiltKey=localStorage.getItem('cdtProductionLastBuilt')||null;}catch(e){lastBuiltKey=null;}
+
+function saveProductionState(){
+  try{
+    localStorage.setItem('cdtProductionStatus',JSON.stringify(builtStatus));
+    localStorage.setItem('cdtProductionLog',JSON.stringify(builtLog.slice(-250)));
+    if(lastBuiltKey)localStorage.setItem('cdtProductionLastBuilt',lastBuiltKey);else localStorage.removeItem('cdtProductionLastBuilt');
+  }catch(e){}
+}
+
+function getProductionSources(){
+  if(loadedFiles.length){
+    return loadedFiles.map((f,i)=>({name:f.name,fr:f.fr,fileIdx:i,key:'file:'+f.name}));
+  }
+  return [{name:'Built-in sample',fr:builtInFr,fileIdx:-1,key:'built-in'}];
+}
+
+function parseCSV(text){
+  const rows=[];let row=[],cell='',q=false;
+  for(let i=0;i<text.length;i++){
+    const ch=text[i],nx=text[i+1];
+    if(ch==='"'&&q&&nx==='"'){cell+='"';i++;}
+    else if(ch==='"')q=!q;
+    else if(ch===','&&!q){row.push(cell.trim());cell='';}
+    else if((ch==='\n'||ch==='\r')&&!q){if(ch==='\r'&&nx==='\n')i++;row.push(cell.trim());if(row.some(v=>v!==''))rows.push(row);row=[];cell='';}
+    else cell+=ch;
+  }
+  row.push(cell.trim());if(row.some(v=>v!==''))rows.push(row);
+  if(!rows.length)return[];
+  const header=rows[0].map(h=>h.toLowerCase());
+  return rows.slice(1).map(r=>{
+    const obj={};header.forEach((h,i)=>obj[h]=r[i]||'');
+    return obj;
+  });
+}
+
+function csvEscape(v){
+  const s=String(v==null?'':v);
+  return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;
+}
+
+function downloadCSV(name,rows){
+  const blob=new Blob([rows.map(r=>r.map(csvEscape).join(',')).join('\n')],{type:'text/csv'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+function buildSubItem(src,subIdx,row={},copy=1){
+  const sub=src.fr.subs[subIdx];
+  const order=+(row.order||0)||999999;
+  const qty=+(row.qty||1)||1;
+  const key=[src.key,sub.uuid||subIdx,row.order||'auto',copy].join('|');
+  const hasOpening=sub.elements.some(e=>e.type==='header'||e.type==='sill');
+  return {
+    key,src,sub,subIdx,order,copy,qty,
+    station:row.station||'',notes:row.notes||'',panel:src.name,
+    label:`${src.name} - Sub ${subIdx+1}`,
+    size:`${Math.round(sub.w)}x${Math.round(sub.h)}`,
+    hasOpening
+  };
+}
+
+function productionItems(){
+  const sources=getProductionSources();
+  const items=[];
+  if(!productionList){
+    sources.forEach(src=>src.fr.subs.forEach((sub,i)=>items.push(buildSubItem(src,i))));
+    return sortProductionItems(items);
+  }
+  productionList.forEach(row=>{
+    const panel=(row.panel||row.file||row.filename||'').toLowerCase();
+    const subSpec=(row.sub||row.subassembly||row.sub_no||'all').toLowerCase();
+    const qty=Math.max(1,+(row.qty||1)||1);
+    const matches=sources.filter(src=>!panel||src.name.toLowerCase()===panel||src.name.toLowerCase().includes(panel)||panel.includes(src.name.toLowerCase()));
+    matches.forEach(src=>{
+      const subIdxs=subSpec==='all'||subSpec===''?src.fr.subs.map((_,i)=>i):[Math.max(0,(+subSpec||1)-1)];
+      subIdxs.forEach(si=>{
+        if(!src.fr.subs[si])return;
+        for(let copy=1;copy<=qty;copy++)items.push(buildSubItem(src,si,row,copy));
+      });
+    });
+  });
+  return sortProductionItems(items);
+}
+
+function sortProductionItems(items){
+  return items.sort((a,b)=>{
+    return a.order-b.order||a.panel.localeCompare(b.panel)||a.subIdx-b.subIdx||a.copy-b.copy;
+  });
+}
+
+function renderMiniSub(item){
+  const sub=item.sub,sc=Math.min(0.055,170/Math.max(sub.w,1),70/Math.max(sub.h,1)),pad=5;
+  const w=sub.w*sc+pad*2,h=sub.h*sc+pad*2;
+  let rects='';
+  sub.elements.forEach(el=>{
+    if(el.type==='sheet')return;
+    const rx=pad+(el.x-sub.x)*sc,ry=pad+(sub.h-(el.y-sub.y)-el.h)*sc,rw=el.w*sc,rh=el.h*sc;
+    if(rw<0.2||rh<0.2)return;
+    const c=el.type==='header'?'#d4a44a':el.type==='sill'?'#bfa060':'#c8a26e';
+    rects+=`<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" fill="${c}" stroke="#555" stroke-width="0.35"/>`;
+  });
+  return `<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">${rects}</svg>`;
+}
+
+function renderBuildLog(){
+  const ul=document.getElementById('buildLog');ul.innerHTML='';
+  builtLog.slice(-80).reverse().forEach(entry=>{
+    const li=document.createElement('li');
+    li.innerHTML=`<span>${entry.action}: ${entry.label}</span><span class="time">${entry.time}</span>`;
+    ul.appendChild(li);
+  });
+}
+
+function currentSourceKey(){
+  if(activeFileIdx===-1)return 'built-in';
+  const f=loadedFiles[activeFileIdx];
+  return f?'file:'+f.name:'built-in';
+}
+
+function currentProductionItem(){
+  if(activeTab==='all')return null;
+  const items=productionItems();
+  if(activeProductionKey){
+    const exact=items.find(it=>it.key===activeProductionKey);
+    if(exact)return exact;
+  }
+  const srcKey=currentSourceKey();
+  const idx=+activeTab;
+  return items.find(it=>it.src.key===srcKey&&it.subIdx===idx)||null;
+}
+
+function selectProductionItem(item){
+  activeProductionKey=item.key;
+  activeFileIdx=item.src.fileIdx;
+  activeTab=''+item.subIdx;
+  switchFile(false);
+  renderProductionBoard();
+}
+
+function setBuilt(item,isBuilt,opts={}){
+  const wasBuilt=builtStatus[item.key]==='built';
+  if(isBuilt&&!wasBuilt&&!confirm(`Mark ${item.label}${item.copy>1?' #'+item.copy:''} as built?`)){
+    renderProductionBoard();
+    updateCurrentBuildPanel();
+    return false;
+  }
+  builtStatus[item.key]=isBuilt?'built':'open';
+  if(isBuilt)lastBuiltKey=item.key;
+  else if(lastBuiltKey===item.key)lastBuiltKey=null;
+  builtLog.push({time:new Date().toLocaleString(),action:isBuilt?'Built':'Reopened',label:item.label});
+  saveProductionState();
+  renderProductionBoard();
+  updateCurrentBuildPanel();
+  if(isBuilt&&opts.advance){
+    const ordered=productionItems();
+    const idx=ordered.findIndex(it=>it.key===item.key);
+    const next=ordered.slice(idx+1).find(it=>builtStatus[it.key]!=='built')||ordered.find(it=>builtStatus[it.key]!=='built');
+    if(next)selectProductionItem(next);
+  }
+  return true;
+}
+
+function updateCurrentBuildPanel(){
+  const panel=document.getElementById('currentBuild');
+  const item=currentProductionItem();
+  if(!item){panel.classList.remove('open');return;}
+  panel.classList.add('open');
+  document.getElementById('currentBuildTitle').textContent=`${item.label}${item.copy>1?' #'+item.copy:''}`;
+  document.getElementById('currentBuildMeta').textContent=`${item.size}${item.station?' | '+item.station:''}${item.notes?' | '+item.notes:''}`;
+  document.getElementById('currentBuildCheck').checked=builtStatus[item.key]==='built';
+}
+
+function renderProductionBoard(){
+  const grid=document.getElementById('subGrid');
+  const items=productionItems();
+  const built=items.filter(it=>builtStatus[it.key]==='built').length;
+  document.getElementById('productionSummary').textContent=`${built}/${items.length} built | ${getProductionSources().length} CDT file(s) | ${productionList?productionList.length+' list row(s)':'all loaded subs'}`;
+  document.getElementById('productionHint').textContent=productionList?`${productionList.length} production list row(s) loaded`:'No production list loaded';
+  document.getElementById('btnHideBuilt').classList.toggle('active',hideBuilt);
+  document.getElementById('btnHideBuilt').textContent=hideBuilt?'Show Built':'Hide Built';
+  grid.innerHTML='';
+  const visibleItems=hideBuilt?items.filter(it=>builtStatus[it.key]!=='built'):items;
+  if(!visibleItems.length){grid.innerHTML='<div class="empty-board">No matching subs. Load CDT files or check the production-list panel/sub names.</div>';renderBuildLog();return;}
+  visibleItems.forEach(item=>{
+    const status=builtStatus[item.key]||'open';
+    const card=document.createElement('div');
+    const isActive=activeProductionKey===item.key||(!activeProductionKey&&activeTab!=='all'&&item.src.key===currentSourceKey()&&item.subIdx===+activeTab);
+    card.className='sub-card '+(status==='built'?'built ':'')+(isActive?'active':'');
+    card.dataset.key=item.key;
+    card.innerHTML=`<input type="checkbox" ${status==='built'?'checked':''} aria-label="Built">
+      ${renderMiniSub(item)}
+      <div>
+        <h4>${item.order===999999?'':item.order+'. '}${item.label}${item.copy>1?' #'+item.copy:''}</h4>
+        <div class="meta"><span>${item.size}</span><span>${item.hasOpening?'Opening sub':'Straight sub'}</span><span class="status-pill">${status==='built'?'Built':'Open'}</span></div>
+        <div class="notes">${item.station?item.station+' - ':''}${item.notes||''}</div>
+      </div>`;
+    card.onclick=()=>selectProductionItem(item);
+    const chk=card.querySelector('input');
+    chk.onclick=e=>{
+      e.stopPropagation();
+      setBuilt(item,chk.checked,{advance:true});
+    };
+    grid.appendChild(card);
+  });
+  const activeTarget=grid.querySelector('.sub-card.active');
+  if(activeTarget)activeTarget.scrollIntoView({block:'nearest'});
+  renderBuildLog();
+}
+
+function setProductionMode(on){
+  productionMode=on;
+  document.getElementById('btnProduction').classList.toggle('active',on);
+  document.getElementById('productionBoard').classList.toggle('open',on);
+  document.body.classList.toggle('production-open',on);
+  if(on)renderProductionBoard();
+}
+
+function refreshFileList(){
+  const ul=document.getElementById('fileList');ul.innerHTML='';
+  // built-in
+  const liB=document.createElement('li');liB.className='file-item'+(activeFileIdx===-1?' active':'');
+  liB.innerHTML=`<span class="fname">Built-in sample</span><span class="finfo">${builtInFr.W}×${builtInFr.H} | ${builtInFr.subs.length} subs</span>`;
+  liB.innerHTML+=renderMiniSvg(builtInFr);
+  liB.onclick=()=>{activeProductionKey=null;activeFileIdx=-1;switchFile();};
+  ul.appendChild(liB);
+  loadedFiles.forEach((f,i)=>{
+    const li=document.createElement('li');li.className='file-item'+(activeFileIdx===i?' active':'');
+    li.innerHTML=`<span class="fname">${f.name}</span><span class="finfo">${f.fr.W}×${f.fr.H} | ${f.fr.subs.length} subs</span>`;
+    li.innerHTML+=renderMiniSvg(f.fr);
+    li.onclick=()=>{activeProductionKey=null;activeFileIdx=i;switchFile();};
+    ul.appendChild(li);
+  });
+}
+
+function switchFile(resetTab=true){
+  // reload global fr reference... we need to re-assign
+  // since fr is const, we swap the data
+  const src=activeFileIdx===-1?builtInFr:loadedFiles[activeFileIdx].fr;
+  // overwrite fr fields
+  fr.W=src.W;fr.H=src.H;fr.D=src.D;
+  fr.elements=src.elements;fr.openings=src.openings;fr.labels=src.labels;fr.nails=src.nails;fr.subs=src.subs;
+  if(resetTab)activeTab='all';
+  buildTabs();refreshFileList();render();if(productionMode)renderProductionBoard();
+}
+
+// file input
+const fileInput=document.getElementById('fileInput');
+document.getElementById('uploadArea').onclick=()=>fileInput.click();
+fileInput.onchange=e=>{
+  const files=[...e.target.files].filter(f=>f.name.toLowerCase().endsWith('.cdt'));
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const raw=ev.target.result;
+      const parsed=parseCDT(raw);
+      if(parsed.W>0){
+        loadedFiles.push({name:file.name,raw,fr:parsed});
+        refreshFileList();if(productionMode)renderProductionBoard();
+      }
+    };
+    reader.readAsText(file);
+  });
+};
+// drag and drop
+document.getElementById('uploadArea').ondragover=e=>{e.preventDefault();e.currentTarget.style.borderColor='#68a';};
+document.getElementById('uploadArea').ondragleave=e=>{e.currentTarget.style.borderColor='#ccc';};
+document.getElementById('uploadArea').ondrop=e=>{
+  e.preventDefault();e.currentTarget.style.borderColor='#ccc';
+  const files=[...e.dataTransfer.files].filter(f=>f.name.toLowerCase().endsWith('.cdt'));
+  files.forEach(file=>{
+    const reader=new FileReader();
+    reader.onload=ev=>{
+      const raw=ev.target.result;const parsed=parseCDT(raw);
+      if(parsed.W>0){loadedFiles.push({name:file.name,raw,fr:parsed});refreshFileList();if(productionMode)renderProductionBoard();}
+    };
+    reader.readAsText(file);
+  });
+};
+
+// ─── QR / V1 payload loading ────────────────────────────────────────────────
+let subMeta={name:'',elf:'I',ref:''};
+function loadV1(code){
+  code=(code||'').trim(); if(!code) return false;
+  let dec; try{ dec=QRCodec.decodeV1(code); }catch(e){ alert('QR decode failed: '+e.message); return false; }
+  const nf=parseCDT(dec.cdt);
+  fr.W=nf.W;fr.H=nf.H;fr.D=nf.D;fr.elements=nf.elements;fr.openings=nf.openings;fr.labels=nf.labels;fr.nails=nf.nails;fr.subs=nf.subs;
+  subMeta={name:dec.name,elf:dec.elf,ref:dec.ref};
+  activeTab='all';
+  // ELF-driven default orientation: show the sheeted side. Provisional map (needs an OUTSIDE sample): INSIDE -> back view.
+  const back=document.getElementById('chkBackView'); if(back) back.checked=(dec.elf==='I');
+  const lbl=document.getElementById('v1sub'); if(lbl) lbl.textContent=(dec.name||'Sub')+(dec.ref?(' · '+dec.ref):'');
+  document.title=(dec.name||'Sub')+(dec.ref?(' · '+dec.ref):'')+' — QR Sub Viewer';
+  buildTabs();render();
+  return true;
+}
+function loadV1FromHash(){
+  let h=(location.hash||'').replace(/^#/,''); if(!h) return false;
+  try{ h=decodeURIComponent(h); }catch(e){}
+  if(h.indexOf('V1*')===0) return loadV1(h);
+  return false;
+}
+window.addEventListener('hashchange',loadV1FromHash);
+{ const b=document.getElementById('v1load'); if(b) b.onclick=()=>loadV1(document.getElementById('v1input').value);
+  const inp=document.getElementById('v1input'); if(inp) inp.addEventListener('keydown',e=>{if(e.key==='Enter')loadV1(inp.value);}); }
+
+refreshFileList();
+if(!loadV1FromHash()) render();
+</script>
+</body>
+</html>
