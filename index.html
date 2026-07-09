@@ -151,6 +151,11 @@
   .cutlist th{position:sticky;top:33px;text-align:left;padding:4px 9px;background:#fbfcfd;border-bottom:1px solid var(--line);font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;}
   .cutlist td{padding:4px 9px;border-bottom:1px solid #f0f3f6;font-family:ui-monospace,monospace;font-size:11px;}
   .cutlist tr:hover{background:#f2f7ff;}
+  .cutlist tr[data-gkey]{cursor:pointer;}
+  .cutlist tr.rowhl{background:#dbeafe!important;}
+  .cutlist .ci-sw{display:inline-block;width:11px;height:11px;border-radius:2px;vertical-align:-1px;}
+  .cutlist .ci-mk{font-family:ui-monospace,monospace;color:var(--accent);text-align:center;}
+  svg#svg rect.cehl{stroke:#2f6feb!important;stroke-width:2px!important;}
   .settings-overlay{display:none;position:fixed;inset:0;background:rgba(15,25,35,.35);z-index:100;}
   .settings-overlay.open{display:block;}
   .settings-panel{position:absolute;top:0;right:0;bottom:0;width:min(92vw,380px);background:var(--panel);box-shadow:-8px 0 30px rgba(0,0,0,.18);padding:16px 18px 48px;overflow-y:auto;border:none;border-radius:0;max-height:none;animation:qslide .18s ease;}
@@ -236,6 +241,12 @@
     <label><input type="checkbox" id="chkNails"> Nails</label>
     <label><input type="checkbox" id="chkSheets"> Sheets</label>
     <label><input type="checkbox" id="chkCutList" checked> Cut list</label>
+  </div>
+  <div class="section">Cut list colour</div>
+  <div class="toggles">
+    <label><input type="checkbox" id="chkColourSize"> Colour by size → drawing</label>
+    <label><input type="checkbox" id="chkMarks"> Mark numbers</label>
+    <label><input type="checkbox" id="chkHeaderHL"> Header highlight</label>
   </div>
 
   <div class="section">Element Colours</div>
@@ -480,11 +491,25 @@ function studType(label){const l=(label||'').toLowerCase();if(l.includes('king')
 
 // ─── Colours ──────────────────────────────────────────────────────────────
 const SUB_COLORS=['cSub0','cSub1','cSub2','cSub3'];
-function elColor(el){if(S.subColour&&el._subIdx!==undefined)return S[SUB_COLORS[el._subIdx%4]];if(el.type==='sheet')return S.cSheet;return{stud:S.cStud,plate:S.cPlate,header:S.cHeader,sill:S.cSill}[el.type]||'#ccc';}
+function elColor(el){
+  if(el.type==='sheet')return S.cSheet;
+  if(cbHdrHL&&el.type==='header')return HEADER_HL;
+  if(cbSize){const c=sizeColourMap[cutDim(el)];if(c)return c;}
+  if(S.subColour&&el._subIdx!==undefined)return S[SUB_COLORS[el._subIdx%4]];
+  return{stud:S.cStud,plate:S.cPlate,header:S.cHeader,sill:S.cSill}[el.type]||'#ccc';
+}
 
 // ─── Draw ─────────────────────────────────────────────────────────────────
-function drawBox(g,el,view,t){const p=projectBox(el,view);const x=t.tx(p.x),y=t.ty(p.y+p.h),w=t.ts(p.w),h=t.ts(p.h);if(w<0.3||h<0.3)return;const r=mkEl('rect',{x,y,width:w,height:h,fill:elColor(el),stroke:'#222','stroke-width':0.5,opacity:el.type==='sheet'?0.35:1},g);const title=document.createElementNS(NS,'title');title.textContent=`${el.label||el.type} ${el.cw}×${el.cd} L=${el.len} @ (${el.x},${el.y})`;r.appendChild(title);if(el._subIdx!==undefined)r.dataset.subIdx=el._subIdx;}
+function drawBox(g,el,view,t){const p=projectBox(el,view);const x=t.tx(p.x),y=t.ty(p.y+p.h),w=t.ts(p.w),h=t.ts(p.h);if(w<0.3||h<0.3)return;const r=mkEl('rect',{x,y,width:w,height:h,fill:elColor(el),stroke:'#222','stroke-width':0.5,opacity:el.type==='sheet'?0.35:1},g);const title=document.createElementNS(NS,'title');title.textContent=`${el.label||el.type} ${el.cw}×${el.cd} L=${el.len} @ (${el.x},${el.y})`;r.appendChild(title);if(el._subIdx!==undefined)r.dataset.subIdx=el._subIdx;r.dataset.gkey=groupKeyOf(el);}
 function drawEls(g,els,v,t){els.forEach(el=>drawBox(g,el,v,t));}
+// numbered mark badge at each member centroid (matches the cut-list mark #)
+function drawMarks(g,els,view,t){
+  els.forEach(el=>{if(el.type==='sheet')return;const m=markByGroup[groupKeyOf(el)];if(!m)return;
+    const p=projectBox(el,view);if(!p)return;const cx=t.tx(p.x+p.w/2),cy=t.ty(p.y+p.h/2);
+    mkEl('circle',{cx,cy,r:6.5,fill:'#fff',stroke:'#333','stroke-width':0.6,opacity:0.92},g);
+    mkEl('text',{x:cx,y:cy+3,'font-size':'9px','text-anchor':'middle','font-family':'monospace',fill:'#111'},g).textContent=''+m;
+  });
+}
 function drawOpenings(g,openings,t){openings.forEach(poly=>{mkEl('polygon',{points:poly.map(p=>`${t.tx(p.x)},${t.ty(p.y)}`).join(' '),fill:'none',stroke:S.cOpening,'stroke-width':1},g);});}
 function drawNails(g,nails,t){nails.forEach(n=>mkEl('circle',{cx:t.tx(n.x1),cy:t.ty(n.y1),r:1.5,fill:'red',opacity:0.6},g));}
 // X marks a cut-end cross-section. A single corner-to-corner cross is drawn where the end is
@@ -821,37 +846,61 @@ function snapPt(pt,spts,tol){
 function drawMeasureLine(g,sx1,sy1,sx2,sy2,label){const mc=S.cMeasure;mkEl('line',{x1:sx1,y1:sy1,x2:sx2,y2:sy2,stroke:mc,'stroke-width':1.5,'stroke-dasharray':'4,3'},g);mkEl('circle',{cx:sx1,cy:sy1,r:3,fill:mc},g);mkEl('circle',{cx:sx2,cy:sy2,r:3,fill:mc},g);const mx=(sx1+sx2)/2,my=(sy1+sy2)/2,tw=Math.max(label.length*6,36);mkEl('rect',{x:mx-tw/2,y:my-8,width:tw,height:14,rx:3,fill:mc},g);mkEl('text',{x:mx,y:my+3,fill:'#fff','font-size':'10px','text-anchor':'middle','font-family':'monospace','font-weight':'bold'},g).textContent=label;}
 
 // ─── Cut list (uses cw, cd, len from WxH and L= in CDT) ──────────────────
+const SIZE_PALETTE=['#E8A33D','#3D9BE8','#9B6DE8','#E86D6D','#4CAF7D','#E8C63D','#8d6e63','#EC7FB0','#5C6BC0','#26A69A'];
+const HEADER_HL='#E8563D';
+let sizeColourMap={},markByGroup={},cbSize=false,cbMarks=false,cbHdrHL=false;
+function cutTypeName(el){
+  if(el.type==='plate')return el.subType==='bottom'?'Bottom Plate':'Top Plate';
+  if(el.type==='header')return 'Header';
+  if(el.type==='sill')return 'Sill';
+  if(el.type==='stud')return studType(el.label);
+  return el.type;
+}
+function cutDim(el){const a=Math.max(el.cw||0,el.cd||0),b=Math.min(el.cw||0,el.cd||0);return a+'×'+b;}  // larger×smaller
+function groupKeyOf(el){return cutTypeName(el)+'|'+cutDim(el)+'|'+el.len;}
 function buildCutList(elements){
   const groups={};
   elements.forEach(el=>{
     if(el.type==='sheet')return;
-    let typeName;
-    if(el.type==='plate')typeName=el.subType==='bottom'?'Bottom Plate':'Top Plate';
-    else if(el.type==='header')typeName='Header';
-    else if(el.type==='sill')typeName='Sill';
-    else if(el.type==='stud')typeName=studType(el.label);
-    else typeName=el.type;
-    const a=Math.max(el.cw||0,el.cd||0),b=Math.min(el.cw||0,el.cd||0);
-    const dim=`${a}×${b}`;                 // normalise to larger×smaller (140×45, not 45×140)
-    const len=el.len;
-    const key=`${typeName}|${dim}|${len}`;
-    if(!groups[key])groups[key]={type:typeName,dim,len,qty:0};
+    const type=cutTypeName(el),dim=cutDim(el),len=el.len,key=type+'|'+dim+'|'+len;
+    if(!groups[key])groups[key]={type,dim,len,qty:0,key};
     groups[key].qty++;
   });
   return Object.values(groups).sort((a,b)=>a.type.localeCompare(b.type)||b.len-a.len);
+}
+function buildColourMarkMaps(items){
+  sizeColourMap={};markByGroup={};
+  [...new Set(items.map(it=>it.dim))].sort().forEach((s,i)=>{sizeColourMap[s]=SIZE_PALETTE[i%SIZE_PALETTE.length];});
+  items.forEach((it,i)=>{markByGroup[it.key]=i+1;});
 }
 function renderCutList(elements){
   const cl=document.getElementById('cutlist');const items=buildCutList(elements);
   const showCutList=document.getElementById('chkCutList').checked;
   cl.classList.toggle('hidden',!showCutList);
   if(!showCutList){cl.innerHTML='';return;}
-  let html=`<h4>Timber Cut List ${cutListCollapsed?'▸':'▾'}</h4><table><tr><th>Type</th><th>Size</th><th>Len</th><th>Qty</th></tr>`;
-  items.forEach(it=>{html+=`<tr><td>${it.type}</td><td>${it.dim}</td><td>${it.len}</td><td>${it.qty}</td></tr>`;});
+  const mk=cbMarks,sw=cbSize;
+  let html=`<h4>Timber Cut List ${cutListCollapsed?'▸':'▾'}</h4><table><tr>${mk?'<th>#</th>':''}${sw?'<th></th>':''}<th>Type</th><th>Size</th><th>Len</th><th>Qty</th></tr>`;
+  items.forEach(it=>{
+    html+=`<tr data-gkey="${it.key}">`+
+      (mk?`<td class="ci-mk">${markByGroup[it.key]||''}</td>`:'')+
+      (sw?`<td><span class="ci-sw" style="background:${sizeColourMap[it.dim]||'#ccc'}"></span></td>`:'')+
+      `<td>${it.type}</td><td>${it.dim}</td><td>${it.len}</td><td>${it.qty}</td></tr>`;
+  });
   html+='</table>';cl.innerHTML=html;
   cl.classList.toggle('collapsed',cutListCollapsed);
   const head=cl.querySelector('h4');
   head.onclick=e=>{e.stopPropagation();if(cutListDidDrag){cutListDidDrag=false;return;}cutListCollapsed=!cutListCollapsed;renderCutList(elements);};
   head.onmousedown=e=>{cutListDrag={x:e.clientX,y:e.clientY,left:cl.offsetLeft,top:cl.offsetTop};cutListDidDrag=false;e.preventDefault();};
+  cl.querySelectorAll('tr[data-gkey]').forEach(tr=>{tr.onclick=()=>highlightGroup(tr.dataset.gkey);});
+}
+let _hlKey=null;
+function highlightGroup(gkey){
+  _hlKey=gkey||null;
+  svgEl.querySelectorAll('rect.cehl').forEach(r=>r.classList.remove('cehl'));
+  document.querySelectorAll('#cutlist tr.rowhl').forEach(r=>r.classList.remove('rowhl'));
+  if(!gkey)return;
+  svgEl.querySelectorAll('rect').forEach(r=>{if(r.dataset.gkey===gkey)r.classList.add('cehl');});
+  document.querySelectorAll('#cutlist tr').forEach(r=>{if(r.dataset.gkey===gkey){r.classList.add('rowhl');r.scrollIntoView({block:'nearest'});}});
 }
 
 // ─── Parse & setup ────────────────────────────────────────────────────────
@@ -910,6 +959,10 @@ function render(){
     elements=mirrorElementsForBack(elements,W);
     openings=mirrorOpeningsForBack(openings,W);
   }
+  cbSize=!!(document.getElementById('chkColourSize')&&document.getElementById('chkColourSize').checked);
+  cbMarks=!!(document.getElementById('chkMarks')&&document.getElementById('chkMarks').checked);
+  cbHdrHL=!!(document.getElementById('chkHeaderHL')&&document.getElementById('chkHeaderHL').checked);
+  buildColourMarkMaps(buildCutList(elements));
   const snapPts=buildSnaps(elements);const scale=S.scale/100;const cfg={W,H,D,scale,PAD:(isSubView?64:(showStudDims?78:50))};const gap=10;
   const frontW=cfg.W*scale+cfg.PAD*2,frontH=cfg.H*scale+cfg.PAD*2;const planH=cfg.D*scale+cfg.PAD*2,sideW=cfg.D*scale+cfg.PAD*2;
   // vertical stack: TOP (plan) · FRONT · BOTTOM (plan); SIDE sits right of FRONT
@@ -938,6 +991,7 @@ function render(){
     drawEls(g,sortV(list,view),view,t);
     if(showCutEnds)drawCutEnds(g,list,view,t);
     if(showSheetSide&&view==='front')drawSheetSide(g,t,cfg);
+    if(cbMarks)drawMarks(g,list,view,t);
     if(showRouting&&view==='front')drawOpenings(g,openings,t);
     if(showOpenDims&&view==='front'&&!isSubView)drawOpeningCentreDims(mkEl('g',{},svgEl),elements,t);
     if(showNails&&view==='front'&&subIdx==='all')drawNails(g,fr.nails,t);
@@ -983,8 +1037,9 @@ function drawSnapMarker(region,pt){
 }
 svgEl.addEventListener('click',e=>{
   if(svgDidDrag){svgDidDrag=false;e.preventDefault();return;}
-  const target=e.target;if(!measureActive&&target.dataset&&target.dataset.subIdx!==undefined){selectSub(+target.dataset.subIdx);return;}
-  if(!measureActive)return;const pt=svgEl.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
+  const target=e.target;
+  if(!measureActive){if(target.dataset&&target.dataset.gkey!==undefined)highlightGroup(target.dataset.gkey);else highlightGroup(null);return;}
+  const pt=svgEl.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
   const sp=pt.matrixTransform(svgEl.getScreenCTM().inverse());const region=hitView(sp.x,sp.y);if(!region)return;
   const real={x:region.inv.ix(sp.x),y:region.inv.iy(sp.y)};const snapped=snapPt(real,region.snapPts,80);const status=document.getElementById('mStatus');
   drawSnapMarker(region,snapped);
@@ -1043,7 +1098,7 @@ window.addEventListener('mouseup',()=>{svgDrag=null;cutListDrag=null;svgEl.class
 document.getElementById('btnMeasure').onclick=()=>{measureActive=!measureActive;document.getElementById('btnMeasure').classList.toggle('active',measureActive);svgEl.classList.toggle('measuring',measureActive);document.getElementById('mStatus').textContent=measureActive?'Snap measure: click P1...':'';if(!measureActive){measureP1=null;if(window._gSnap)window._gSnap.innerHTML='';}};
 document.getElementById('btnClear').onclick=()=>{if(window._gMeasure)window._gMeasure.innerHTML='';if(window._gSnap)window._gSnap.innerHTML='';measureP1=null;document.getElementById('mStatus').textContent='';};
 document.getElementById('btnZoomReset').onclick=()=>resetSvgView(svgView.baseW,svgView.baseH);
-['chkFront','chkBackView','chkTop','chkSide','chkBottom','chkHideKing','chkDims','chkStudDims','chkOpenDims','chkSpecs','chkRouting','chkNails','chkSheets','chkOriginDims','chkOriginR','chkCutEnds','chkSheetSide','chkCutList'].forEach(id=>{const el=document.getElementById(id);if(el)el.onchange=render;});
+['chkFront','chkBackView','chkTop','chkSide','chkBottom','chkHideKing','chkDims','chkStudDims','chkOpenDims','chkSpecs','chkRouting','chkNails','chkSheets','chkOriginDims','chkOriginR','chkCutEnds','chkSheetSide','chkCutList','chkColourSize','chkMarks','chkHeaderHL'].forEach(id=>{const el=document.getElementById(id);if(el)el.onchange=render;});
 // ─── QR / V1 payload loading ────────────────────────────────────────────────
 let subMeta={name:'',elf:'I',ref:''};
 function loadV1(code){
