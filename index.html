@@ -106,8 +106,20 @@
   #v1bar strong { font-size:12px; }
   #v1bar input { font-family:monospace; font-size:11px; padding:3px 6px; border:1px solid #aac; border-radius:3px; }
   #v1bar button { font-size:11px; padding:3px 10px; border:1px solid #68a; border-radius:3px; background:#fff; cursor:pointer; }
+  #v1bar #scanBtn { background:#4477aa; color:#fff; border-color:#4477aa; font-weight:bold; }
+  #scanOverlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:200; justify-content:center; align-items:center; }
+  #scanOverlay.open { display:flex; }
+  .scan-box { background:#111; color:#fff; border-radius:10px; padding:12px; width:min(94vw,460px); display:flex; flex-direction:column; gap:8px; }
+  .scan-head { display:flex; justify-content:space-between; align-items:center; font-size:15px; }
+  .scan-head button { background:#333; color:#fff; border:none; border-radius:4px; width:28px; height:28px; font-size:16px; cursor:pointer; }
+  #scanVideo { width:100%; border-radius:8px; background:#000; aspect-ratio:1/1; object-fit:cover; }
+  .scan-status { font-size:12px; color:#9bd; font-family:monospace; min-height:16px; }
+  .scan-manual { display:flex; gap:6px; }
+  .scan-manual input { flex:1; font-family:monospace; font-size:12px; padding:6px; border-radius:4px; border:1px solid #555; background:#222; color:#fff; }
+  .scan-manual button { padding:6px 12px; border-radius:4px; border:none; background:#4477aa; color:#fff; cursor:pointer; }
 </style>
 <script src="qr-codec.js"></script>
+<script src="vendor/jsQR.min.js"></script>
 </head>
 <body>
 
@@ -151,6 +163,7 @@
   <button id="btnSettings">⚙ Settings</button>
 </div>
 <div id="v1bar">
+  <button id="scanBtn">📷 Scan</button>
   <strong id="v1sub">—</strong>
   <span style="flex:1"></span>
   <input id="v1input" placeholder="Paste V1 code (V1*S:...)" style="flex:2;min-width:180px;">
@@ -248,6 +261,19 @@
     <button id="btnSettingsReset">Reset defaults</button>
   </div>
 </div>
+</div>
+
+<!-- Camera scanner overlay -->
+<div id="scanOverlay">
+  <div class="scan-box">
+    <div class="scan-head"><b>Scan a sub QR</b><button id="scanCancel">✕</button></div>
+    <video id="scanVideo" playsinline muted></video>
+    <div id="scanStatus" class="scan-status">Starting camera…</div>
+    <div class="scan-manual">
+      <input id="scanPaste" placeholder="…or paste a V1 code">
+      <button id="scanPasteBtn">Render</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -1329,6 +1355,51 @@ function loadV1FromHash(){
 window.addEventListener('hashchange',loadV1FromHash);
 { const b=document.getElementById('v1load'); if(b) b.onclick=()=>loadV1(document.getElementById('v1input').value);
   const inp=document.getElementById('v1input'); if(inp) inp.addEventListener('keydown',e=>{if(e.key==='Enter')loadV1(inp.value);}); }
+
+// ─── Camera scanner (jsQR) ──────────────────────────────────────────────────
+let scanStream=null,scanRAF=null;
+const scanOverlay=document.getElementById('scanOverlay');
+const scanVideo=document.getElementById('scanVideo');
+const scanStatusEl=document.getElementById('scanStatus');
+const scanCanvas=document.createElement('canvas');
+function openScanner(){
+  if(!scanOverlay)return;
+  scanOverlay.classList.add('open');
+  scanStatusEl.textContent='Starting camera…';
+  if(typeof jsQR==='undefined'){scanStatusEl.textContent='Scanner library missing — paste a code instead.';return;}
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){scanStatusEl.textContent='No camera here (needs HTTPS) — paste a code instead.';return;}
+  navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'}}})
+    .then(stream=>{scanStream=stream;scanVideo.srcObject=stream;return scanVideo.play();})
+    .then(()=>{scanStatusEl.textContent='Point at a sub QR…';scanRAF=requestAnimationFrame(tickScan);})
+    .catch(err=>{scanStatusEl.textContent='Camera error: '+err.message+' — paste a code instead.';});
+}
+function tickScan(){
+  if(!scanOverlay.classList.contains('open'))return;
+  if(scanVideo.readyState===scanVideo.HAVE_ENOUGH_DATA&&scanVideo.videoWidth){
+    const w=scanVideo.videoWidth,h=scanVideo.videoHeight;
+    scanCanvas.width=w;scanCanvas.height=h;
+    const ctx=scanCanvas.getContext('2d',{willReadFrequently:true});
+    ctx.drawImage(scanVideo,0,0,w,h);
+    let res=null;try{const img=ctx.getImageData(0,0,w,h);res=jsQR(img.data,w,h,{inversionAttempts:'dontInvert'});}catch(e){}
+    if(res&&res.data){
+      const txt=res.data.trim(),i=txt.indexOf('V1*');
+      if(i>=0){closeScanner();loadV1(txt.slice(i));return;}
+      scanStatusEl.textContent='Not a sub QR — keep pointing…';
+    }
+  }
+  scanRAF=requestAnimationFrame(tickScan);
+}
+function closeScanner(){
+  if(!scanOverlay)return;
+  scanOverlay.classList.remove('open');
+  if(scanRAF){cancelAnimationFrame(scanRAF);scanRAF=null;}
+  if(scanStream){scanStream.getTracks().forEach(t=>t.stop());scanStream=null;}
+  scanVideo.srcObject=null;
+}
+{ const b=document.getElementById('scanBtn');if(b)b.onclick=openScanner;
+  const c=document.getElementById('scanCancel');if(c)c.onclick=closeScanner;
+  const pb=document.getElementById('scanPasteBtn');if(pb)pb.onclick=()=>{if(loadV1(document.getElementById('scanPaste').value))closeScanner();};
+  const pi=document.getElementById('scanPaste');if(pi)pi.addEventListener('keydown',e=>{if(e.key==='Enter'&&loadV1(pi.value))closeScanner();}); }
 
 refreshFileList();
 if(!loadV1FromHash()) render();
