@@ -139,15 +139,20 @@
   <label><input type="checkbox" id="chkBackView"> Back view</label>
   <label><input type="checkbox" id="chkTop" checked> Top</label>
   <label><input type="checkbox" id="chkSide" checked> Side</label>
+  <label><input type="checkbox" id="chkBottom" checked> Bottom</label>
+  <label><input type="checkbox" id="chkHideKing" checked> Hide king</label>
   <div class="sep"></div>
   <label><input type="checkbox" id="chkDims" checked> Dims</label>
   <label><input type="checkbox" id="chkStudDims" checked> Stud chain</label>
   <label><input type="checkbox" id="chkOpenDims" checked> Opening dims</label>
-  <label><input type="checkbox" id="chkSpecs"> Specs</label>
+  <label><input type="checkbox" id="chkSpecs" checked> Specs</label>
   <label><input type="checkbox" id="chkRouting" checked> Routing</label>
   <label><input type="checkbox" id="chkNails"> Nails</label>
   <label><input type="checkbox" id="chkSheets"> Sheets</label>
-  <label><input type="checkbox" id="chkOriginDims"> Origin dims</label>
+  <label><input type="checkbox" id="chkOriginDims" checked> Origin dims</label>
+  <label><input type="checkbox" id="chkOriginR"> Origin R</label>
+  <label><input type="checkbox" id="chkCutEnds" checked> Cut ends</label>
+  <label><input type="checkbox" id="chkSheetSide" checked> Sheet side</label>
   <label><input type="checkbox" id="chkCutList" checked> Cut list</label>
   <div class="sep"></div>
   <button id="btnMeasure">Measure</button>
@@ -437,10 +442,10 @@ function parseCDT(text){
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
-function projectBox(el,v){if(v==='front')return{x:el.x,y:el.y,w:el.w,h:el.h};if(v==='top')return{x:el.x,y:el.z,w:el.w,h:el.d};if(v==='side')return{x:el.z,y:el.y,w:el.d,h:el.h};}
-function makeT(v,cfg,ox,oy){const{PAD,scale:sc,W,H,D}=cfg;if(v==='front')return{tx:x=>ox+PAD+x*sc,ty:y=>oy+PAD+(H-y)*sc,ts:v2=>v2*sc};if(v==='top')return{tx:x=>ox+PAD+x*sc,ty:z=>oy+PAD+(D-z)*sc,ts:v2=>v2*sc};if(v==='side')return{tx:z=>ox+PAD+z*sc,ty:y=>oy+PAD+(H-y)*sc,ts:v2=>v2*sc};}
-function makeInv(v,cfg,ox,oy){const{PAD,scale:sc,H,D}=cfg;if(v==='front')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>H-((sy-oy-PAD)/sc)};if(v==='top')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>D-((sy-oy-PAD)/sc)};if(v==='side')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>H-((sy-oy-PAD)/sc)};}
-function sortV(els,v){return[...els].sort((a,b)=>{if(v==='front')return(a.z+a.d)-(b.z+b.d);if(v==='top')return(a.y+a.h)-(b.y+b.h);if(v==='side')return(a.x+a.w)-(b.x+b.w);return 0;});}
+function projectBox(el,v){if(v==='front')return{x:el.x,y:el.y,w:el.w,h:el.h};if(v==='top'||v==='bottom')return{x:el.x,y:el.z,w:el.w,h:el.d};if(v==='side')return{x:el.z,y:el.y,w:el.d,h:el.h};}
+function makeT(v,cfg,ox,oy){const{PAD,scale:sc,W,H,D}=cfg;if(v==='front')return{tx:x=>ox+PAD+x*sc,ty:y=>oy+PAD+(H-y)*sc,ts:v2=>v2*sc};if(v==='top')return{tx:x=>ox+PAD+x*sc,ty:z=>oy+PAD+(D-z)*sc,ts:v2=>v2*sc};if(v==='bottom')return{tx:x=>ox+PAD+x*sc,ty:z=>oy+PAD+z*sc,ts:v2=>v2*sc};if(v==='side')return{tx:z=>ox+PAD+z*sc,ty:y=>oy+PAD+(H-y)*sc,ts:v2=>v2*sc};}
+function makeInv(v,cfg,ox,oy){const{PAD,scale:sc,H,D}=cfg;if(v==='front')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>H-((sy-oy-PAD)/sc)};if(v==='top')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>D-((sy-oy-PAD)/sc)};if(v==='bottom')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>(sy-oy-PAD)/sc};if(v==='side')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>H-((sy-oy-PAD)/sc)};}
+function sortV(els,v){return[...els].sort((a,b)=>{if(v==='front')return(a.z+a.d)-(b.z+b.d);if(v==='top')return(a.y+a.h)-(b.y+b.h);if(v==='bottom')return(b.y+b.h)-(a.y+a.h);if(v==='side')return(a.x+a.w)-(b.x+b.w);return 0;});}
 function studType(label){const l=(label||'').toLowerCase();if(l.includes('king'))return'King Stud';if(l.includes('jackov'))return'Jack (over)';if(l.includes('jackund'))return'Jack (under)';if(l.includes('jack'))return'Jack Stud';if(l.includes('left')||l.includes('right'))return'End Stud';return'Stud';}
 
 // ─── Colours ──────────────────────────────────────────────────────────────
@@ -452,6 +457,30 @@ function drawBox(g,el,view,t){const p=projectBox(el,view);const x=t.tx(p.x),y=t.
 function drawEls(g,els,v,t){els.forEach(el=>drawBox(g,el,v,t));}
 function drawOpenings(g,openings,t){openings.forEach(poly=>{mkEl('polygon',{points:poly.map(p=>`${t.tx(p.x)},${t.ty(p.y)}`).join(' '),fill:'none',stroke:S.cOpening,'stroke-width':1},g);});}
 function drawNails(g,nails,t){nails.forEach(n=>mkEl('circle',{cx:t.tx(n.x1),cy:t.ty(n.y1),r:1.5,fill:'red',opacity:0.6},g));}
+// X on each framing member's two cut ends (short edges of the projected box)
+function drawCutEnds(g,els,view,t){
+  els.forEach(el=>{
+    if(el.type==='sheet')return;
+    const p=projectBox(el,view);if(!p)return;
+    const x=t.tx(p.x),y=t.ty(p.y+p.h),w=t.ts(p.w),h=t.ts(p.h);
+    if(w<3||h<3)return;
+    const s=Math.min(w,h);
+    const ends=(h>=w)?[[x,y,w,s],[x,y+h-s,w,s]]:[[x,y,s,h],[x+w-s,y,s,h]];
+    ends.forEach(e=>{const ax=e[0],ay=e[1],bw=e[2],bh=e[3];
+      mkEl('line',{x1:ax,y1:ay,x2:ax+bw,y2:ay+bh,stroke:'#333','stroke-width':0.6,opacity:0.65},g);
+      mkEl('line',{x1:ax+bw,y1:ay,x2:ax,y2:ay+bh,stroke:'#333','stroke-width':0.6,opacity:0.65},g);
+    });
+  });
+}
+// hatched strip on the sheeted face of the front view (driven by ELF)
+function drawSheetSide(g,t,cfg){
+  const elf=(typeof subMeta!=='undefined'&&subMeta.elf)||'I';
+  const x=t.tx(cfg.W)+4,y1=t.ty(cfg.H),y2=t.ty(0);
+  const strip=mkEl('rect',{x:x,y:y1,width:7,height:y2-y1,fill:S.cSheet,opacity:0.5,stroke:'#555','stroke-width':0.3},g);
+  strip.appendChild(document.createElementNS(NS,'title')).textContent='Sheeted side (ELF:'+(elf==='O'?'OUTSIDE':'INSIDE')+')';
+  const tx=x+3.5,ty=(y1+y2)/2;
+  mkEl('text',{x:tx,y:ty,fill:'#555','font-size':'8px','text-anchor':'middle','font-family':'monospace',transform:'rotate(90 '+tx+' '+ty+')'},g).textContent='SHEETED SIDE '+(elf==='O'?'(OUT)':'(IN)');
+}
 
 // ─── Dimension helpers (use settings) ─────────────────────────────────────
 function DC(){return S.cDim;}function DF(){return S.dimFont+'px';}function DLW(){return S.dimLine/10;}function DTK(){return S.dimTick;}function DEX(){return S.dimExt==='none'?undefined:S.dimExt;}
@@ -535,43 +564,30 @@ function drawChainDims(g,elements,t){
 
 // ─── Origin dims: distance from x=0 to outside (right) edge of each stud cluster ──
 // Uses studs sitting on/near bottom plate (under studs), not over studs
-function drawOriginDims(g,elements,t){
-  // filter to studs whose y is near the bottom plate (y < 100, ie sitting on plate)
-  const underStuds=elements.filter(e=>e.type==='stud'&&e.y<100).sort((a,b)=>a.x-b.x);
-  if(!underStuds.length)return;
-
-  // Build clusters: merge studs that touch or overlap
-  const blocks=[];
-  let curL=underStuds[0].x, curR=underStuds[0].x+underStuds[0].w;
-  for(let i=1;i<underStuds.length;i++){
-    const sl=underStuds[i].x, sr=underStuds[i].x+underStuds[i].w;
-    if(sl<=curR+2){ curR=Math.max(curR,sr); }
-    else { blocks.push({l:curL,r:curR}); curL=sl; curR=sr; }
-  }
+// One row of origin dims from x=0: clusters touching studs, labels the chosen edge (left/right).
+// dir=+1 draws below the anchor (under-studs), dir=-1 draws above (over-studs). anchorMm = frame y to hang from.
+function drawOriginRow(g,studs,t,edge,dir,anchorMm){
+  if(!studs.length)return;
+  studs=studs.slice().sort((a,b)=>a.x-b.x);
+  const blocks=[];let curL=studs[0].x,curR=studs[0].x+studs[0].w;
+  for(let i=1;i<studs.length;i++){const sl=studs[i].x,sr=studs[i].x+studs[i].w;
+    if(sl<=curR+2){curR=Math.max(curR,sr);}else{blocks.push({l:curL,r:curR});curL=sl;curR=sr;}}
   blocks.push({l:curL,r:curR});
-
-  const fs=S.dimFont;
-  const lw=DLW();
-  const ext=DEX();
-  const yBase=t.ty(0);
-  const baseOff=14; // tight below frame
-
+  const fs=S.dimFont,lw=DLW(),ext=DEX(),yBase=t.ty(anchorMm);
   blocks.forEach(b=>{
-    const rx=Math.round(b.r);
-    const sx=t.tx(rx);
-    const labelY=yBase+baseOff+fs;
-
-    // dashed line from bottom of frame down to label
-    const lineAttrs={x1:sx,y1:yBase+2,x2:sx,y2:labelY-fs,stroke:DC(),'stroke-width':lw*0.6};
-    if(ext)lineAttrs['stroke-dasharray']=ext;
-    mkEl('line',lineAttrs,g);
-
-    // small tick
-    mkEl('line',{x1:sx-2,y1:labelY-fs,x2:sx+2,y2:labelY-fs,stroke:DC(),'stroke-width':lw},g);
-
-    // label
-    mkEl('text',{x:sx,y:labelY,fill:DC(),'font-size':fs+'px','text-anchor':'middle','font-family':'monospace'},g).textContent=rx+'';
+    const val=Math.round(edge==='r'?b.r:b.l),sx=t.tx(val),labelY=yBase+dir*(14+fs);
+    const la={x1:sx,y1:yBase+dir*2,x2:sx,y2:labelY-dir*fs,stroke:DC(),'stroke-width':lw*0.6};
+    if(ext)la['stroke-dasharray']=ext;mkEl('line',la,g);
+    mkEl('line',{x1:sx-2,y1:labelY-dir*fs,x2:sx+2,y2:labelY-dir*fs,stroke:DC(),'stroke-width':lw},g);
+    mkEl('text',{x:sx,y:labelY,fill:DC(),'font-size':fs+'px','text-anchor':'middle','font-family':'monospace'},g).textContent=val+'';
   });
+}
+function drawOriginDims(g,elements,t){
+  const cb=document.getElementById('chkOriginR');
+  const edge=(cb&&cb.checked)?'r':'l';
+  drawOriginRow(g,elements.filter(e=>e.type==='stud'&&e.y<100),t,edge,+1,0);          // under-studs, below
+  const over=elements.filter(e=>e.type==='stud'&&/jackov/i.test(e.label||''));         // over-opening studs, above
+  if(over.length){const top=Math.max.apply(null,over.map(e=>e.y+e.h));drawOriginRow(g,over,t,edge,-1,top);}
 }
 
 function drawStudPositionDims(g,elements,t){
@@ -827,6 +843,10 @@ function render(){
   svgEl.innerHTML='';viewRegions=[];
   const showF=document.getElementById('chkFront').checked,showT=document.getElementById('chkTop').checked,showS=document.getElementById('chkSide').checked;
   const showBack=document.getElementById('chkBackView').checked;
+  const showB=document.getElementById('chkBottom')?document.getElementById('chkBottom').checked:false;
+  const sideHideKing=document.getElementById('chkHideKing')?document.getElementById('chkHideKing').checked:false;
+  const showCutEnds=document.getElementById('chkCutEnds')?document.getElementById('chkCutEnds').checked:false;
+  const showSheetSide=document.getElementById('chkSheetSide')?document.getElementById('chkSheetSide').checked:false;
   const showDims=document.getElementById('chkDims').checked,showStudDims=document.getElementById('chkStudDims').checked,showOpenDims=document.getElementById('chkOpenDims').checked;
   const showSpecs=document.getElementById('chkSpecs').checked,showRouting=document.getElementById('chkRouting').checked;
   const showNails=document.getElementById('chkNails').checked,showSheets=document.getElementById('chkSheets').checked;
@@ -851,20 +871,20 @@ function render(){
     openings=mirrorOpeningsForBack(openings,W);
   }
   const snapPts=buildSnaps(elements);const scale=S.scale/100;const cfg={W,H,D,scale,PAD:(isSubView?64:(showStudDims?78:50))};const gap=10;
-  const frontW=cfg.W*scale+cfg.PAD*2,frontH=cfg.H*scale+cfg.PAD*2;const topH=cfg.D*scale+cfg.PAD*2,sideW=cfg.D*scale+cfg.PAD*2;
-  let totalW=0,totalH=0;
-  if(showF){totalW=frontW;totalH=frontH;}
-  if(showS){totalW=(showF?frontW+gap:0)+sideW;totalH=Math.max(totalH,frontH);}
-  if(showT){totalH=(showF?frontH:(showS?frontH:0))+gap+topH;totalW=Math.max(totalW,frontW);}
-  if(!showF&&!showT&&!showS){totalW=200;totalH=40;}
+  const frontW=cfg.W*scale+cfg.PAD*2,frontH=cfg.H*scale+cfg.PAD*2;const planH=cfg.D*scale+cfg.PAD*2,sideW=cfg.D*scale+cfg.PAD*2;
+  // vertical stack: TOP (plan) · FRONT · BOTTOM (plan); SIDE sits right of FRONT
+  const topOy=0,frontOy=(showT?planH+gap:0),bottomOy=frontOy+(showF?frontH+gap:0);
+  const frontOx=0,topOx=0,bottomOx=0,sideOx=(showF?frontW:0)+gap,sideOy=frontOy;
+  let totalW=(showF?frontW:(showS?0:200))+(showS?gap+sideW:0);
+  let totalH=(showT?planH+gap:0)+(showF?frontH:0)+(showB?gap+planH:0);
+  if(!showF&&!showT&&!showS&&!showB){totalW=200;totalH=40;}
   if(isSubView){totalW+=80;totalH+=50;}
   if(showOriginDims){totalH+=40;}
   svgEl.setAttribute('width',totalW);svgEl.setAttribute('height',totalH);
   resetSvgView(totalW,totalH);
-  const frontOx=0,frontOy=0,sideOx=frontW+gap,sideOy=0,topOx=0,topOy=(showF?frontH:(showS?frontH:0))+gap;
   const cl=document.getElementById('cutlist');
   const cutLeft=showS?sideOx:(showF?frontW+gap:10);
-  const cutTop=showT?topOy:(showF?frontH+gap:10);
+  const cutTop=frontOy;
   if(!cutListCustomPos){
     cl.style.left=Math.round(cutLeft)+'px';
     cl.style.top=Math.round(cutTop)+'px';
@@ -872,16 +892,19 @@ function render(){
 
   function doView(view,ox,oy,pxW,pxH){
     const t=makeT(view,cfg,ox,oy),inv=makeInv(view,cfg,ox,oy);const g=mkEl('g',{},svgEl);
-    let label=view.toUpperCase();if(view==='front'&&showBack)label='BACK';if(view==='top')label='TOP (plates hidden)';if(isSubView)label+=' — Sub '+(+subIdx+1);
+    let label=view.toUpperCase();if(view==='front'&&showBack)label='BACK';if(view==='top')label='TOP (plan)';if(view==='bottom')label='BOTTOM (plan)';if(isSubView)label+=' — Sub '+(+subIdx+1);
     mkEl('text',{x:ox+10,y:oy+15},svgEl).textContent=label;
-    let list=[...elements];if(view==='top')list=list.filter(e=>e.type!=='plate');if(!showSheets)list=list.filter(e=>e.type!=='sheet');
+    let list=[...elements];if(view==='top'||view==='bottom')list=list.filter(e=>e.type!=='plate');if(view==='side'&&sideHideKing)list=list.filter(e=>!(e.type==='stud'&&/king/i.test(e.label||'')));if(!showSheets)list=list.filter(e=>e.type!=='sheet');
     drawEls(g,sortV(list,view),view,t);
+    if(showCutEnds)drawCutEnds(g,list,view,t);
+    if(showSheetSide&&view==='front')drawSheetSide(g,t,cfg);
     if(showRouting&&view==='front')drawOpenings(g,openings,t);
     if(showOpenDims&&view==='front'&&!isSubView)drawOpeningCentreDims(mkEl('g',{},svgEl),elements,t);
     if(showNails&&view==='front'&&subIdx==='all')drawNails(g,fr.nails,t);
     if(showDims&&!isSubView){const gD=mkEl('g',{},svgEl);
       if(view==='front'){drawDimV(gD,t.ty(H),t.ty(0),t.tx(0),-16,H+'');}
       else if(view==='top'){drawDimH(gD,t.tx(0),t.tx(W),t.ty(0),12,W+'');drawDimV(gD,t.ty(D),t.ty(0),t.tx(0),-12,D+'');}
+      else if(view==='bottom'){drawDimH(gD,t.tx(0),t.tx(W),t.ty(D),12,W+'');drawDimV(gD,t.ty(0),t.ty(D),t.tx(0),-12,D+'');}
       else if(view==='side'){drawDimH(gD,t.tx(0),t.tx(D),t.ty(0),12,D+'');drawDimV(gD,t.ty(H),t.ty(0),t.tx(0),-12,H+'');}}
     if(showStudDims&&view==='front'&&!isSubView){const gC=mkEl('g',{},svgEl);drawDimH(gC,t.tx(0),t.tx(W),t.ty(0),18,W+'');drawChainDims(mkEl('g',{},svgEl),elements,t);}
     if(showOriginDims&&view==='front')drawOriginDims(mkEl('g',{},svgEl),elements,t);
@@ -898,9 +921,10 @@ function render(){
     }
     viewRegions.push({view,ox,oy,pxW,pxH,t,inv,snapPts});
   }
+  if(showT)doView('top',topOx,topOy,frontW,planH);
   if(showF)doView('front',frontOx,frontOy,frontW,frontH);
+  if(showB)doView('bottom',bottomOx,bottomOy,frontW,planH);
   if(showS)doView('side',sideOx,sideOy,sideW,frontH);
-  if(showT)doView('top',topOx,topOy,frontW,topH);
   window._gMeasure=mkEl('g',{},svgEl);
   window._gSnap=mkEl('g',{},svgEl);
   renderCutList(elements);
@@ -980,7 +1004,7 @@ window.addEventListener('mouseup',()=>{svgDrag=null;cutListDrag=null;svgEl.class
 document.getElementById('btnMeasure').onclick=()=>{measureActive=!measureActive;document.getElementById('btnMeasure').classList.toggle('active',measureActive);svgEl.classList.toggle('measuring',measureActive);document.getElementById('mStatus').textContent=measureActive?'Snap measure: click P1...':'';if(!measureActive){measureP1=null;if(window._gSnap)window._gSnap.innerHTML='';}};
 document.getElementById('btnClear').onclick=()=>{if(window._gMeasure)window._gMeasure.innerHTML='';if(window._gSnap)window._gSnap.innerHTML='';measureP1=null;document.getElementById('mStatus').textContent='';};
 document.getElementById('btnZoomReset').onclick=()=>resetSvgView(svgView.baseW,svgView.baseH);
-['chkFront','chkBackView','chkTop','chkSide','chkDims','chkStudDims','chkOpenDims','chkSpecs','chkRouting','chkNails','chkSheets','chkOriginDims','chkCutList'].forEach(id=>{document.getElementById(id).onchange=render;});
+['chkFront','chkBackView','chkTop','chkSide','chkBottom','chkHideKing','chkDims','chkStudDims','chkOpenDims','chkSpecs','chkRouting','chkNails','chkSheets','chkOriginDims','chkOriginR','chkCutEnds','chkSheetSide','chkCutList'].forEach(id=>{const el=document.getElementById(id);if(el)el.onchange=render;});
 document.getElementById('btnProduction').onclick=()=>setProductionMode(!productionMode);
 document.getElementById('btnImportList').onclick=()=>document.getElementById('productionInput').click();
 document.getElementById('productionInput').onchange=e=>{
