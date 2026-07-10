@@ -222,7 +222,6 @@
     <label><input type="checkbox" id="chkTop" checked> Top</label>
     <label><input type="checkbox" id="chkBottom" checked> Bottom</label>
     <label><input type="checkbox" id="chkSide" checked> Side</label>
-    <label><input type="checkbox" id="chkHideKing" checked> Hide king (side)</label>
   </div>
   <div class="section">Dimensions &amp; labels</div>
   <div class="toggles">
@@ -487,6 +486,16 @@ function projectBox(el,v){if(v==='front')return{x:el.x,y:el.y,w:el.w,h:el.h};if(
 function makeT(v,cfg,ox,oy){const{PAD,scale:sc,W,H,D}=cfg;if(v==='front')return{tx:x=>ox+PAD+x*sc,ty:y=>oy+PAD+(H-y)*sc,ts:v2=>v2*sc};if(v==='top')return{tx:x=>ox+PAD+x*sc,ty:z=>oy+PAD+(D-z)*sc,ts:v2=>v2*sc};if(v==='bottom')return{tx:x=>ox+PAD+x*sc,ty:z=>oy+PAD+z*sc,ts:v2=>v2*sc};if(v==='side')return{tx:z=>ox+PAD+z*sc,ty:y=>oy+PAD+(H-y)*sc,ts:v2=>v2*sc};}
 function makeInv(v,cfg,ox,oy){const{PAD,scale:sc,H,D}=cfg;if(v==='front')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>H-((sy-oy-PAD)/sc)};if(v==='top')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>D-((sy-oy-PAD)/sc)};if(v==='bottom')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>(sy-oy-PAD)/sc};if(v==='side')return{ix:sx=>(sx-ox-PAD)/sc,iy:sy=>H-((sy-oy-PAD)/sc)};}
 function sortV(els,v){return[...els].sort((a,b)=>{if(v==='front')return(a.z+a.d)-(b.z+b.d);if(v==='top')return(a.y+a.h)-(b.y+b.h);if(v==='bottom')return(b.y+b.h)-(a.y+a.h);if(v==='side')return(a.x+a.w)-(b.x+b.w);return 0;});}
+// draw ALL members, but push a view's key parts LAST so they sit on top:
+// top → jack-overs, bottom → jack-unders, side → headers (behind the king stud otherwise)
+function viewOrder(list,view){
+  const base=sortV(list,view);let last=null;
+  if(view==='top')last=e=>e.type==='stud'&&/jackov/i.test(e.label||'');
+  else if(view==='bottom')last=e=>e.type==='stud'&&/jackund/i.test(e.label||'');
+  else if(view==='side')last=e=>e.type==='header';
+  if(!last)return base;
+  return base.filter(e=>!last(e)).concat(base.filter(e=>last(e)));
+}
 function studType(label){const l=(label||'').toLowerCase();if(l.includes('king'))return'King Stud';if(l.includes('jackov'))return'Jack (over)';if(l.includes('jackund'))return'Jack (under)';if(l.includes('jack'))return'Jack Stud';if(l.includes('left')||l.includes('right'))return'End Stud';return'Stud';}
 
 // ─── Colours ──────────────────────────────────────────────────────────────
@@ -541,13 +550,13 @@ function drawCutEnds(g,els,view,t){
   });
 }
 // hatched strip on the sheeted face of the front view (driven by ELF)
+// horizontal sheeted-side band along the near face, drawn under the TOP (plan) view
 function drawSheetSide(g,t,cfg){
   const elf=(typeof subMeta!=='undefined'&&subMeta.elf)||'I';
-  const x=t.tx(cfg.W)+4,y1=t.ty(cfg.H),y2=t.ty(0);
-  const strip=mkEl('rect',{x:x,y:y1,width:7,height:y2-y1,fill:S.cSheet,opacity:0.5,stroke:'#555','stroke-width':0.3},g);
+  const x1=t.tx(0),x2=t.tx(cfg.W),y=t.ty(0)+26;   // clear of the top view's width dimension
+  const strip=mkEl('rect',{x:x1,y:y,width:x2-x1,height:7,fill:S.cSheet,opacity:0.55,stroke:'#555','stroke-width':0.3},g);
   strip.appendChild(document.createElementNS(NS,'title')).textContent='Sheeted side (ELF:'+(elf==='O'?'OUTSIDE':'INSIDE')+')';
-  const tx=x+3.5,ty=(y1+y2)/2;
-  mkEl('text',{x:tx,y:ty,fill:'#555','font-size':'8px','text-anchor':'middle','font-family':'monospace',transform:'rotate(90 '+tx+' '+ty+')'},g).textContent='SHEETED SIDE '+(elf==='O'?'(OUT)':'(IN)');
+  mkEl('text',{x:(x1+x2)/2,y:y+16,fill:'#555','font-size':'8px','text-anchor':'middle','font-family':'monospace'},g).textContent='SHEETED SIDE '+(elf==='O'?'(OUT)':'(IN)');
 }
 
 // ─── Dimension helpers (use settings) ─────────────────────────────────────
@@ -933,7 +942,6 @@ function render(){
   const showF=document.getElementById('chkFront').checked,showT=document.getElementById('chkTop').checked,showS=document.getElementById('chkSide').checked;
   const showBack=document.getElementById('chkBackView').checked;
   const showB=document.getElementById('chkBottom')?document.getElementById('chkBottom').checked:false;
-  const sideHideKing=document.getElementById('chkHideKing')?document.getElementById('chkHideKing').checked:false;
   const showCutEnds=document.getElementById('chkCutEnds')?document.getElementById('chkCutEnds').checked:false;
   const showSheetSide=document.getElementById('chkSheetSide')?document.getElementById('chkSheetSide').checked:false;
   const showDims=document.getElementById('chkDims').checked,showStudDims=document.getElementById('chkStudDims').checked,showOpenDims=document.getElementById('chkOpenDims').checked;
@@ -987,10 +995,10 @@ function render(){
     const t=makeT(view,cfg,ox,oy),inv=makeInv(view,cfg,ox,oy);const g=mkEl('g',{},svgEl);
     let label=view.toUpperCase();if(view==='front'&&showBack)label='BACK';if(view==='top')label='TOP (plan)';if(view==='bottom')label='BOTTOM (plan)';if(isSubView)label+=' — Sub '+(+subIdx+1);
     mkEl('text',{x:ox+10,y:oy+15},svgEl).textContent=label;
-    let list=[...elements];if(view==='top'||view==='bottom')list=list.filter(e=>e.type!=='plate');if(view==='side'&&sideHideKing)list=list.filter(e=>!(e.type==='stud'&&/king/i.test(e.label||'')));if(!showSheets)list=list.filter(e=>e.type!=='sheet');
-    drawEls(g,sortV(list,view),view,t);
+    let list=[...elements];if(view==='top'||view==='bottom')list=list.filter(e=>e.type!=='plate');if(!showSheets)list=list.filter(e=>e.type!=='sheet');
+    drawEls(g,viewOrder(list,view),view,t);
     if(showCutEnds)drawCutEnds(g,list,view,t);
-    if(showSheetSide&&view==='front')drawSheetSide(g,t,cfg);
+    if(showSheetSide&&view==='top')drawSheetSide(g,t,cfg);
     if(cbMarks)drawMarks(g,list,view,t);
     if(showRouting&&view==='front')drawOpenings(g,openings,t);
     if(showOpenDims&&view==='front'&&!isSubView)drawOpeningCentreDims(mkEl('g',{},svgEl),elements,t);
@@ -1098,7 +1106,7 @@ window.addEventListener('mouseup',()=>{svgDrag=null;cutListDrag=null;svgEl.class
 document.getElementById('btnMeasure').onclick=()=>{measureActive=!measureActive;document.getElementById('btnMeasure').classList.toggle('active',measureActive);svgEl.classList.toggle('measuring',measureActive);document.getElementById('mStatus').textContent=measureActive?'Snap measure: click P1...':'';if(!measureActive){measureP1=null;if(window._gSnap)window._gSnap.innerHTML='';}};
 document.getElementById('btnClear').onclick=()=>{if(window._gMeasure)window._gMeasure.innerHTML='';if(window._gSnap)window._gSnap.innerHTML='';measureP1=null;document.getElementById('mStatus').textContent='';};
 document.getElementById('btnZoomReset').onclick=()=>resetSvgView(svgView.baseW,svgView.baseH);
-['chkFront','chkBackView','chkTop','chkSide','chkBottom','chkHideKing','chkDims','chkStudDims','chkOpenDims','chkSpecs','chkRouting','chkNails','chkSheets','chkOriginDims','chkOriginR','chkCutEnds','chkSheetSide','chkCutList','chkColourSize','chkMarks','chkHeaderHL'].forEach(id=>{const el=document.getElementById(id);if(el)el.onchange=render;});
+['chkFront','chkBackView','chkTop','chkSide','chkBottom','chkDims','chkStudDims','chkOpenDims','chkSpecs','chkRouting','chkNails','chkSheets','chkOriginDims','chkOriginR','chkCutEnds','chkSheetSide','chkCutList','chkColourSize','chkMarks','chkHeaderHL'].forEach(id=>{const el=document.getElementById(id);if(el)el.onchange=render;});
 // ─── QR / V1 payload loading ────────────────────────────────────────────────
 let subMeta={name:'',elf:'I',ref:''};
 function loadV1(code){
