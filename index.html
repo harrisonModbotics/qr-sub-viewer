@@ -320,7 +320,7 @@
 
 <!-- Black landing page -->
 <div id="landing">
-  <button id="landingTest" class="landing-test">🧪 Test sub</button>
+  <select id="landingTest" class="landing-test"></select>
   <div class="landing-mid">
     <div class="landing-logo">▤</div>
     <button id="landingScan">📷 Scan a sub QR</button>
@@ -549,23 +549,24 @@ function memberLenAxis(el){
   if(el.type==='stud'&&/block|nog/i.test(el.label||''))return 'x';
   return el.type==='stud'?'y':'x';
 }
-function drawCutEnds(g,els,view,t){
+function drawCutEnds(g,els,view,t,cfg){
+  const H=cfg?cfg.H:0,tol=3;
   function cross(ax,ay,bw,bh){
     mkEl('line',{x1:ax,y1:ay,x2:ax+bw,y2:ay+bh,stroke:'#333','stroke-width':0.7,opacity:0.7},g);
     mkEl('line',{x1:ax+bw,y1:ay,x2:ax,y2:ay+bh,stroke:'#333','stroke-width':0.7,opacity:0.7},g);
   }
   els.forEach(el=>{
     if(el.type==='sheet')return;
+    let show=false;                                                 // only mark cut ends you can actually see
+    if(view==='top')      show=el.type==='stud'&&(el.y+el.h)>=H-tol;// stud top reaches the frame top
+    else if(view==='bottom') show=el.type==='stud'&&el.y<=tol;      // stud bottom sits on the floor
+    else if(view==='side')   show=memberLenAxis(el)==='x';          // horizontal members seen end-on
+    // front elevation shows faces, never a cut-end cross-section → no X
+    if(!show)return;
     const p=projectBox(el,view);if(!p)return;
     const x=t.tx(p.x),y=t.ty(p.y+p.h),w=t.ts(p.w),h=t.ts(p.h);
     if(w<2||h<2)return;
-    const len=memberLenAxis(el);
-    const faceOn=(view==='top'||view==='bottom')?(len==='y'):(view==='side')?(len==='x'):false;
-    if(faceOn){cross(x,y,w,h);return;}                      // whole cross-section = the end face
-    if(view==='front'){
-      if(len==='y'){const s=Math.min(w,h*0.4);cross(x,y,w,s);cross(x,y+h-s,w,s);}   // stud: top & bottom
-      else{const s=Math.min(h,w*0.4);cross(x,y,s,h);cross(x+w-s,y,s,h);}            // header/plate: left & right
-    }
+    cross(x,y,w,h);
   });
 }
 // hatched strip on the sheeted face of the front view (driven by ELF)
@@ -1018,7 +1019,7 @@ function render(){
     mkEl('text',{x:ox+10,y:oy+15},svgEl).textContent=label;
     let list=[...elements];if(view==='top'||view==='bottom')list=list.filter(e=>e.type!=='plate');if(!showSheets)list=list.filter(e=>e.type!=='sheet');
     drawEls(g,viewOrder(list,view),view,t);
-    if(showCutEnds)drawCutEnds(g,list,view,t);
+    if(showCutEnds)drawCutEnds(g,list,view,t,cfg);
     if(showSheetSide&&view==='top')drawSheetSide(g,t,cfg);
     if(cbMarks)drawMarks(g,list,view,t);
     if(showRouting&&view==='front')drawOpenings(g,openings,t);
@@ -1200,10 +1201,18 @@ function closeScanner(){
   const pb=document.getElementById('scanPasteBtn');if(pb)pb.onclick=()=>{if(loadV1(document.getElementById('scanPaste').value))closeScanner();};
   const pi=document.getElementById('scanPaste');if(pi)pi.addEventListener('keydown',e=>{if(e.key==='Enter'&&loadV1(pi.value))closeScanner();}); }
 
-const TEST_CODE='V1*S:2070:2712:140:WA6:I:BM-W-04*K:0:0:0:45:2712:140*K:45:0:0:45:2287:140*JO:45:2332:50:45:80:90*H:45:2412:95:1980:300:45*H:45:2412:50:1980:300:45*H:45:2332:0:1980:140:45*H:45:2287:0:1980:45:140*JO:255:2332:50:45:80:90*JO:856:2332:50:45:80:90*JO:1457:2332:50:45:80:90*K:1980:0:0:45:2287:140*JO:1980:2332:50:45:80:90*K:2025:0:0:45:2712:140';
+const TEST_SUBS=[
+  {label:'Window — WA6', code:'V1*S:2070:2712:140:WA6:I:BM-W-04*K:0:0:0:45:2712:140*K:45:0:0:45:2287:140*JO:45:2332:50:45:80:90*H:45:2412:95:1980:300:45*H:45:2412:50:1980:300:45*H:45:2332:0:1980:140:45*H:45:2287:0:1980:45:140*JO:255:2332:50:45:80:90*JO:856:2332:50:45:80:90*JO:1457:2332:50:45:80:90*K:1980:0:0:45:2287:140*JO:1980:2332:50:45:80:90*K:2025:0:0:45:2712:140'},
+  {label:'Window + sill — WB2', code:'V1*S:1200:2400:90:WB2:I:BM-W-08*K:0:0:0:45:2400:90*K:1155:0:0:45:2400:90*J:45:0:0:45:2000:90*J:1110:0:0:45:2000:90*H:90:2000:0:1020:150:45*H:90:2000:45:1020:150:45*L:90:900:0:1020:45:90*JO:300:2150:0:45:250:90*JO:600:2150:0:45:250:90*JO:855:2150:0:45:250:90*JU:300:0:0:45:900:90*JU:600:0:0:45:900:90*JU:855:0:0:45:900:90'},
+  {label:'Door — DR3', code:'V1*S:1000:2400:90:DR3:I:BM-D-02*K:0:0:0:45:2400:90*K:955:0:0:45:2400:90*J:45:0:0:45:2100:90*J:910:0:0:45:2100:90*H:90:2100:0:820:150:45*H:90:2100:45:820:150:45*JO:300:2250:0:45:150:90*JO:600:2250:0:45:150:90'},
+  {label:'Junction — JN1', code:'V1*S:600:2400:90:JN1:I:BM-J-05*E:0:0:0:45:2400:90*S:0:0:45:45:2400:90*S:200:0:0:45:2400:90*S:400:0:0:45:2400:90*S:555:0:0:45:2400:90*B:45:1180:0:510:90:45'}
+];
 function hideLanding(){const l=document.getElementById('landing');if(l)l.classList.add('hidden');}
 { const ls=document.getElementById('landingScan');if(ls)ls.onclick=()=>{hideLanding();openScanner();};
-  const lt=document.getElementById('landingTest');if(lt)lt.onclick=()=>loadV1(TEST_CODE); }
+  const sel=document.getElementById('landingTest');
+  if(sel){ const ph=document.createElement('option');ph.textContent='🧪 Test sub…';ph.value='';ph.disabled=true;ph.selected=true;sel.appendChild(ph);
+    TEST_SUBS.forEach((s,i)=>{const o=document.createElement('option');o.value=i;o.textContent=s.label;sel.appendChild(o);});
+    sel.onchange=()=>{const i=+sel.value;if(TEST_SUBS[i])loadV1(TEST_SUBS[i].code);sel.selectedIndex=0;}; } }
 loadV1FromHash();   // a code in the URL renders + hides the landing; otherwise the landing stays up
 </script>
 </body>
