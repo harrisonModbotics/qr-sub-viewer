@@ -176,6 +176,15 @@
   .settings-panel button{margin-top:10px;padding:8px 14px;font-size:13px;border:1px solid var(--line);border-radius:8px;background:#f7f9fb;cursor:pointer;}
   .settings-panel button:hover{background:#eef2f7;}
   #btnSettingsClose{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important;}
+  #landing{position:fixed;inset:0;background:#0d1117;z-index:150;display:flex;align-items:center;justify-content:center;}
+  #landing.hidden{display:none;}
+  .landing-mid{display:flex;flex-direction:column;align-items:center;gap:16px;padding:20px;}
+  .landing-logo{width:56px;height:56px;border-radius:14px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:30px;}
+  #landingScan{background:var(--accent);color:#fff;border:none;border-radius:14px;padding:16px 30px;font-size:19px;font-weight:600;cursor:pointer;box-shadow:0 10px 40px rgba(47,111,235,.45);}
+  #landingScan:active{transform:scale(.98);}
+  .landing-hint{color:#6b7885;font-size:13px;max-width:260px;text-align:center;line-height:1.5;}
+  .landing-test{position:absolute;top:14px;right:14px;background:#1b2530;color:#8fa0b2;border:1px solid #2c3a48;border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;}
+  .landing-test:hover{background:#22303d;}
   #scanOverlay{display:none;position:fixed;inset:0;background:rgba(10,16,22,.9);z-index:200;justify-content:center;align-items:center;}
   #scanOverlay.open{display:flex;}
   .scan-box{background:#141a20;color:#fff;border-radius:14px;padding:16px;width:min(94vw,440px);display:flex;flex-direction:column;gap:10px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
@@ -307,6 +316,16 @@
     <button id="btnSettingsReset">Reset defaults</button>
   </div>
 </div>
+</div>
+
+<!-- Black landing page -->
+<div id="landing">
+  <button id="landingTest" class="landing-test">🧪 Test sub</button>
+  <div class="landing-mid">
+    <div class="landing-logo">▤</div>
+    <button id="landingScan">📷 Scan a sub QR</button>
+    <div class="landing-hint">Point your camera at the QR code on the production sheet</div>
+  </div>
 </div>
 
 <!-- Camera scanner overlay -->
@@ -553,10 +572,10 @@ function drawCutEnds(g,els,view,t){
 // horizontal sheeted-side band along the near face, drawn under the TOP (plan) view
 function drawSheetSide(g,t,cfg){
   const elf=(typeof subMeta!=='undefined'&&subMeta.elf)||'I';
-  const x1=t.tx(0),x2=t.tx(cfg.W),y=t.ty(0)+26;   // clear of the top view's width dimension
-  const strip=mkEl('rect',{x:x1,y:y,width:x2-x1,height:7,fill:S.cSheet,opacity:0.55,stroke:'#555','stroke-width':0.3},g);
+  const x1=t.tx(0),x2=t.tx(cfg.W),y=t.ty(0)+4;   // thin grey band close to the near-face edge of the TOP view
+  const strip=mkEl('rect',{x:x1,y:y,width:x2-x1,height:3,fill:'#9aa0a6',opacity:0.9},g);
   strip.appendChild(document.createElementNS(NS,'title')).textContent='Sheeted side (ELF:'+(elf==='O'?'OUTSIDE':'INSIDE')+')';
-  mkEl('text',{x:(x1+x2)/2,y:y+16,fill:'#555','font-size':'8px','text-anchor':'middle','font-family':'monospace'},g).textContent='SHEETED SIDE '+(elf==='O'?'(OUT)':'(IN)');
+  mkEl('text',{x:(x1+x2)/2,y:y+10,fill:'#8a939c','font-size':'6px','text-anchor':'middle','font-family':'monospace'},g).textContent='SHEETED SIDE '+(elf==='O'?'(OUT)':'(IN)');
 }
 
 // ─── Dimension helpers (use settings) ─────────────────────────────────────
@@ -663,12 +682,14 @@ function drawOriginRow(g,studs,t,edge,dir,anchorMm,baseOff){
     mkEl('text',{x:sx,y:labelY,fill:DC(),'font-size':fs+'px','text-anchor':'middle','font-family':'monospace'},g).textContent=val+'';
   });
 }
-function drawOriginDims(g,elements,t){
-  const cb=document.getElementById('chkOriginR');
-  const edge=(cb&&cb.checked)?'r':'l';
-  drawOriginRow(g,elements.filter(e=>e.type==='stud'&&e.y<100),t,edge,+1,0,16);         // under-studs, below
-  const over=elements.filter(e=>e.type==='stud'&&/jackov/i.test(e.label||''));          // over-opening studs, above
-  if(over.length){const top=Math.max.apply(null,over.map(e=>e.y+e.h));drawOriginRow(g,over,t,edge,-1,top,12);}
+function drawOriginDims(g,elements,t,view,cfg){
+  const cb=document.getElementById('chkOriginR');const edge=(cb&&cb.checked)?'r':'l';
+  if(view==='top'){                                                                     // over-opening studs, above the TOP plan
+    const over=elements.filter(e=>e.type==='stud'&&/jackov/i.test(e.label||''));
+    if(over.length)drawOriginRow(g,over,t,edge,-1,cfg.D,12);
+    return;
+  }
+  drawOriginRow(g,elements.filter(e=>e.type==='stud'&&e.y<100),t,edge,+1,0,16);         // under-studs, below FRONT
 }
 
 function drawStudPositionDims(g,elements,t){
@@ -1005,11 +1026,11 @@ function render(){
     if(showNails&&view==='front'&&subIdx==='all')drawNails(g,fr.nails,t);
     if(showDims&&!isSubView){const gD=mkEl('g',{},svgEl);
       if(view==='front'){drawDimV(gD,t.ty(H),t.ty(0),t.tx(0),-16,H+'');drawDimH(gD,t.tx(0),t.tx(W),t.ty(H),-18,W+'');}
-      else if(view==='top'){drawDimH(gD,t.tx(0),t.tx(W),t.ty(0),12,W+'');drawDimV(gD,t.ty(D),t.ty(0),t.tx(0),-12,D+'');}
+      else if(view==='top'){drawDimV(gD,t.ty(D),t.ty(0),t.tx(0),-12,D+'');}
       else if(view==='bottom'){drawDimH(gD,t.tx(0),t.tx(W),t.ty(D),12,W+'');drawDimV(gD,t.ty(0),t.ty(D),t.tx(0),-12,D+'');}
       else if(view==='side'){drawDimH(gD,t.tx(0),t.tx(D),t.ty(0),12,D+'');drawDimV(gD,t.ty(H),t.ty(0),t.tx(0),-12,H+'');}}
     if(showStudDims&&view==='front'&&!isSubView){const gC=mkEl('g',{},svgEl);drawDimH(gC,t.tx(0),t.tx(W),t.ty(0),18,W+'');drawChainDims(mkEl('g',{},svgEl),elements,t);}
-    if(showOriginDims&&view==='front')drawOriginDims(mkEl('g',{},svgEl),elements,t);
+    if(showOriginDims&&(view==='front'||view==='top'))drawOriginDims(mkEl('g',{},svgEl),elements,t,view,cfg);
     if(showSpecs&&view==='front')drawSpecLabels(mkEl('g',{},svgEl),elements,t);
     if(isSubView&&view==='front')drawSubDims(mkEl('g',{},svgEl),elements,t,{showDims,showStudDims});
     if(subIdx==='all'&&view==='front'){
@@ -1112,6 +1133,7 @@ let subMeta={name:'',elf:'I',ref:''};
 function loadV1(code){
   code=(code||'').trim(); if(!code) return false;
   let dec; try{ dec=QRCodec.decodeV1(code); }catch(e){ alert('QR decode failed: '+e.message); return false; }
+  hideLanding();
   const nf=parseCDT(dec.cdt);
   fr.W=nf.W;fr.H=nf.H;fr.D=nf.D;fr.elements=nf.elements;fr.openings=nf.openings;fr.labels=nf.labels;fr.nails=nf.nails;fr.subs=nf.subs;
   subMeta={name:dec.name,elf:dec.elf,ref:dec.ref};
@@ -1178,11 +1200,11 @@ function closeScanner(){
   const pb=document.getElementById('scanPasteBtn');if(pb)pb.onclick=()=>{if(loadV1(document.getElementById('scanPaste').value))closeScanner();};
   const pi=document.getElementById('scanPaste');if(pi)pi.addEventListener('keydown',e=>{if(e.key==='Enter'&&loadV1(pi.value))closeScanner();}); }
 
-function renderEmptyOrDemo(){
-  const lbl=document.getElementById('v1sub'); if(lbl) lbl.textContent='Demo — tap 📷 Scan';
-  render();
-}
-if(!loadV1FromHash()) renderEmptyOrDemo();
+const TEST_CODE='V1*S:2070:2712:140:WA6:I:BM-W-04*K:0:0:0:45:2712:140*K:45:0:0:45:2287:140*JO:45:2332:50:45:80:90*H:45:2412:95:1980:300:45*H:45:2412:50:1980:300:45*H:45:2332:0:1980:140:45*H:45:2287:0:1980:45:140*JO:255:2332:50:45:80:90*JO:856:2332:50:45:80:90*JO:1457:2332:50:45:80:90*K:1980:0:0:45:2287:140*JO:1980:2332:50:45:80:90*K:2025:0:0:45:2712:140';
+function hideLanding(){const l=document.getElementById('landing');if(l)l.classList.add('hidden');}
+{ const ls=document.getElementById('landingScan');if(ls)ls.onclick=()=>{hideLanding();openScanner();};
+  const lt=document.getElementById('landingTest');if(lt)lt.onclick=()=>loadV1(TEST_CODE); }
+loadV1FromHash();   // a code in the URL renders + hides the landing; otherwise the landing stays up
 </script>
 </body>
 </html>
