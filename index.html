@@ -2,6 +2,15 @@
 <html>
 <head>
 <meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,maximum-scale=1,user-scalable=no"/>
+<meta name="theme-color" content="#0d1117"/>
+<link rel="manifest" href="manifest.webmanifest"/>
+<link rel="apple-touch-icon" href="icon.svg"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="Sub Viewer"/>
+<title>QR Sub Viewer</title>
 <style>
   body { font-family:sans-serif; margin:8px; }
   svg#svg { border:1px solid #ccc; background:#fafafa; cursor:grab; vertical-align:top; display:block; touch-action:none; }
@@ -921,7 +930,7 @@ function renderCutList(elements){
   cl.classList.toggle('collapsed',cutListCollapsed);
   const head=cl.querySelector('h4');
   head.onclick=e=>{e.stopPropagation();if(cutListDidDrag){cutListDidDrag=false;return;}cutListCollapsed=!cutListCollapsed;renderCutList(elements);};
-  head.onmousedown=e=>{cutListDrag={x:e.clientX,y:e.clientY,left:cl.offsetLeft,top:cl.offsetTop};cutListDidDrag=false;e.preventDefault();};
+  head.onpointerdown=e=>{cutListDrag={id:e.pointerId,x:e.clientX,y:e.clientY,left:cl.offsetLeft,top:cl.offsetTop};cutListDidDrag=false;e.preventDefault();};
   cl.querySelectorAll('tr[data-gkey]').forEach(tr=>{tr.onclick=()=>highlightGroup(tr.dataset.gkey);});
 }
 let _hlKey=null;
@@ -1065,12 +1074,28 @@ function drawSnapMarker(region,pt){
   mkEl('line',{x1:region.t.tx(pt.x)-7,y1:region.t.ty(pt.y),x2:region.t.tx(pt.x)+7,y2:region.t.ty(pt.y),stroke:S.cMeasure,'stroke-width':1},window._gSnap);
   mkEl('line',{x1:region.t.tx(pt.x),y1:region.t.ty(pt.y)-7,x2:region.t.tx(pt.x),y2:region.t.ty(pt.y)+7,stroke:S.cMeasure,'stroke-width':1},window._gSnap);
 }
-svgEl.addEventListener('click',e=>{
-  if(svgDidDrag){svgDidDrag=false;e.preventDefault();return;}
-  const target=e.target;
-  if(!measureActive){if(target.dataset&&target.dataset.gkey!==undefined)highlightGroup(target.dataset.gkey);else highlightGroup(null);return;}
-  const pt=svgEl.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
-  const sp=pt.matrixTransform(svgEl.getScreenCTM().inverse());const region=hitView(sp.x,sp.y);if(!region)return;
+// ─── Unified pointer interaction: pan · pinch-zoom · tap-select · tap-measure ─
+// Pointer Events cover mouse, touch and pen. Active pointers live in a Map;
+// 1 pointer = pan (or measure), 2 = pinch-zoom about the centroid, a tap (no
+// movement) selects / places a measure point, and a double-tap resets the view.
+const pointers=new Map();          // pointerId -> {x,y}
+let gesture=null;                  // {mode:'pan',x,y,vx,vy}
+let pinch=null;                    // {dist,midX,midY,view}
+let tapCand=null;                  // {x,y,moved,target}
+let wasPinch=false;                // this gesture ever had 2+ fingers
+let lastTapTime=0,lastTapX=0,lastTapY=0;
+const TAP_MOVE=7;                  // px slop below which a lift counts as a tap
+function svgPoint(cx,cy){const pt=svgEl.createSVGPoint();pt.x=cx;pt.y=cy;return pt.matrixTransform(svgEl.getScreenCTM().inverse());}
+function clampW(w){return Math.min(svgView.baseW*3,Math.max(svgView.baseW/8,w));}
+function clampH(h){return Math.min(svgView.baseH*3,Math.max(svgView.baseH/8,h));}
+
+function updateSnapPreview(cx,cy){
+  const sp=svgPoint(cx,cy);const region=hitView(sp.x,sp.y);if(!region)return;
+  const real={x:region.inv.ix(sp.x),y:region.inv.iy(sp.y)};
+  drawSnapMarker(region,snapPt(real,region.snapPts,80));
+}
+function measureTap(cx,cy){
+  const sp=svgPoint(cx,cy);const region=hitView(sp.x,sp.y);if(!region)return;
   const real={x:region.inv.ix(sp.x),y:region.inv.iy(sp.y)};const snapped=snapPt(real,region.snapPts,80);const status=document.getElementById('mStatus');
   drawSnapMarker(region,snapped);
   if(!measureP1){measureP1={x:snapped.x,y:snapped.y,region};status.textContent=`P1:(${Math.round(snapped.x)},${Math.round(snapped.y)}) [${region.view}] ${snapped.snapped?'snap ':''}→ P2`;}
@@ -1078,52 +1103,100 @@ svgEl.addEventListener('click',e=>{
     const dx=snapped.x-measureP1.x,dy=snapped.y-measureP1.y,dist=Math.sqrt(dx*dx+dy*dy);
     drawMeasureLine(window._gMeasure,region.t.tx(measureP1.x),region.t.ty(measureP1.y),region.t.tx(snapped.x),region.t.ty(snapped.y),Math.round(dist)+'mm');
     status.textContent=`${Math.round(dist)}mm (Δ${Math.round(Math.abs(dx))},${Math.round(Math.abs(dy))}) ${snapped.snapped?'snapped':''}`;measureP1=null;}
+}
+function selectOrDoubleTap(tc){
+  const now=Date.now();
+  if(now-lastTapTime<300&&Math.abs(tc.x-lastTapX)+Math.abs(tc.y-lastTapY)<28){   // double-tap → fit
+    resetSvgView(svgView.baseW,svgView.baseH);lastTapTime=0;return;
+  }
+  lastTapTime=now;lastTapX=tc.x;lastTapY=tc.y;
+  const target=tc.target;
+  if(target&&target.dataset&&target.dataset.gkey!==undefined)highlightGroup(target.dataset.gkey);
+  else highlightGroup(null);
+}
+function startPinch(){
+  const p=[...pointers.values()];
+  pinch={dist:Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y)||1,midX:(p[0].x+p[1].x)/2,midY:(p[0].y+p[1].y)/2,view:{...svgView}};
+}
+function pinchMove(){
+  if(!pinch)startPinch();
+  const p=[...pointers.values()];
+  const dist=Math.hypot(p[1].x-p[0].x,p[1].y-p[0].y)||1;
+  const midX=(p[0].x+p[1].x)/2,midY=(p[0].y+p[1].y)/2;
+  const rect=svgEl.getBoundingClientRect(),base=pinch.view;if(!rect.width||!rect.height)return;
+  const nextW=clampW(base.w*(pinch.dist/dist)),nextH=clampH(base.h*(pinch.dist/dist));
+  // world point under the ORIGINAL centroid stays put; re-anchor to the CURRENT
+  // centroid so a two-finger drag pans while pinching.
+  const fx=(pinch.midX-rect.left)/rect.width,fy=(pinch.midY-rect.top)/rect.height;
+  const worldX=base.x+fx*base.w,worldY=base.y+fy*base.h;
+  const cfx=(midX-rect.left)/rect.width,cfy=(midY-rect.top)/rect.height;
+  svgView.w=nextW;svgView.h=nextH;svgView.x=worldX-cfx*nextW;svgView.y=worldY-cfy*nextH;applySvgView();
+}
+svgEl.addEventListener('pointerdown',e=>{
+  if(e.button&&e.button!==0)return;             // ignore right/middle mouse
+  try{svgEl.setPointerCapture(e.pointerId);}catch(_){}
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(pointers.size>=2){wasPinch=true;tapCand=null;gesture=null;svgEl.classList.remove('panning');startPinch();}
+  else{
+    tapCand={x:e.clientX,y:e.clientY,moved:false,target:e.target};
+    if(!measureActive){gesture={mode:'pan',x:e.clientX,y:e.clientY,vx:svgView.x,vy:svgView.y};svgEl.classList.add('panning');}
+    else{gesture=null;updateSnapPreview(e.clientX,e.clientY);}
+  }
+  e.preventDefault();
 });
-svgEl.addEventListener('mousemove',e=>{
-  if(!measureActive)return;
-  const pt=svgEl.createSVGPoint();pt.x=e.clientX;pt.y=e.clientY;
-  const sp=pt.matrixTransform(svgEl.getScreenCTM().inverse());const region=hitView(sp.x,sp.y);if(!region)return;
-  const real={x:region.inv.ix(sp.x),y:region.inv.iy(sp.y)};
-  drawSnapMarker(region,snapPt(real,region.snapPts,80));
+svgEl.addEventListener('pointermove',e=>{
+  if(!pointers.has(e.pointerId)){if(measureActive)updateSnapPreview(e.clientX,e.clientY);return;}   // hovering mouse
+  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+  if(tapCand&&(Math.abs(e.clientX-tapCand.x)+Math.abs(e.clientY-tapCand.y)>TAP_MOVE))tapCand.moved=true;
+  if(pointers.size>=2){pinchMove();return;}
+  if(measureActive){updateSnapPreview(e.clientX,e.clientY);return;}
+  if(gesture&&gesture.mode==='pan'){
+    const rect=svgEl.getBoundingClientRect();if(!rect.width||!rect.height)return;
+    svgView.x=gesture.vx-(e.clientX-gesture.x)/rect.width*svgView.w;
+    svgView.y=gesture.vy-(e.clientY-gesture.y)/rect.height*svgView.h;applySvgView();
+  }
 });
+function endPointer(e){
+  const lastX=e.clientX,lastY=e.clientY,wasTap=tapCand&&!tapCand.moved,tc=tapCand;
+  pointers.delete(e.pointerId);
+  try{svgEl.releasePointerCapture(e.pointerId);}catch(_){}
+  if(pointers.size===0){
+    svgEl.classList.remove('panning');
+    if(measureActive){if(!wasPinch)measureTap(lastX,lastY);}
+    else if(wasTap)selectOrDoubleTap(tc);
+    gesture=null;pinch=null;tapCand=null;wasPinch=false;
+  }else if(pointers.size===1){                  // dropped from pinch to one finger → resume pan
+    pinch=null;const only=[...pointers.values()][0];
+    gesture=measureActive?null:{mode:'pan',x:only.x,y:only.y,vx:svgView.x,vy:svgView.y};
+  }
+}
+svgEl.addEventListener('pointerup',endPointer);
+svgEl.addEventListener('pointercancel',endPointer);
 
-let svgDrag=null,svgDidDrag=false;
-svgEl.addEventListener('wheel',e=>{
+svgEl.addEventListener('wheel',e=>{                // desktop scroll-to-zoom
   if(!svgView.baseW)return;
   e.preventDefault();
-  const rect=svgEl.getBoundingClientRect();
+  const rect=svgEl.getBoundingClientRect();if(!rect.width||!rect.height)return;
   const mx=svgView.x+((e.clientX-rect.left)/rect.width)*svgView.w;
   const my=svgView.y+((e.clientY-rect.top)/rect.height)*svgView.h;
   const factor=e.deltaY<0?0.85:1.18;
-  const nextW=Math.min(svgView.baseW*3,Math.max(svgView.baseW/8,svgView.w*factor));
-  const nextH=Math.min(svgView.baseH*3,Math.max(svgView.baseH/8,svgView.h*factor));
+  const nextW=clampW(svgView.w*factor),nextH=clampH(svgView.h*factor);
   svgView.x=mx-((e.clientX-rect.left)/rect.width)*nextW;
   svgView.y=my-((e.clientY-rect.top)/rect.height)*nextH;
   svgView.w=nextW;svgView.h=nextH;applySvgView();
 },{passive:false});
-svgEl.addEventListener('mousedown',e=>{
-  if(measureActive||e.button!==0)return;
-  svgDrag={x:e.clientX,y:e.clientY,vx:svgView.x,vy:svgView.y};
-  svgDidDrag=false;svgEl.classList.add('panning');e.preventDefault();
+
+// Cut-list drag (Pointer Events → works with touch too)
+window.addEventListener('pointermove',e=>{
+  if(!cutListDrag||e.pointerId!==cutListDrag.id)return;
+  const cl=document.getElementById('cutlist');
+  const dx=e.clientX-cutListDrag.x,dy=e.clientY-cutListDrag.y;
+  if(Math.abs(dx)+Math.abs(dy)>3)cutListDidDrag=true;
+  cl.style.left=Math.max(0,cutListDrag.left+dx)+'px';
+  cl.style.top=Math.max(0,cutListDrag.top+dy)+'px';
+  cutListCustomPos=true;
 });
-window.addEventListener('mousemove',e=>{
-  if(cutListDrag){
-    const cl=document.getElementById('cutlist');
-    const dx=e.clientX-cutListDrag.x,dy=e.clientY-cutListDrag.y;
-    if(Math.abs(dx)+Math.abs(dy)>3)cutListDidDrag=true;
-    cl.style.left=Math.max(0,cutListDrag.left+dx)+'px';
-    cl.style.top=Math.max(0,cutListDrag.top+dy)+'px';
-    cutListCustomPos=true;
-    return;
-  }
-  if(!svgDrag)return;
-  const rect=svgEl.getBoundingClientRect();
-  const dx=(e.clientX-svgDrag.x)/rect.width*svgView.w;
-  const dy=(e.clientY-svgDrag.y)/rect.height*svgView.h;
-  if(Math.abs(e.clientX-svgDrag.x)+Math.abs(e.clientY-svgDrag.y)>3)svgDidDrag=true;
-  svgView.x=svgDrag.vx-dx;svgView.y=svgDrag.vy-dy;applySvgView();
-});
-window.addEventListener('mouseup',()=>{svgDrag=null;cutListDrag=null;svgEl.classList.remove('panning');});
+window.addEventListener('pointerup',e=>{if(cutListDrag&&e.pointerId===cutListDrag.id)cutListDrag=null;});
 
 document.getElementById('btnMeasure').onclick=()=>{measureActive=!measureActive;document.getElementById('btnMeasure').classList.toggle('active',measureActive);svgEl.classList.toggle('measuring',measureActive);document.getElementById('mStatus').textContent=measureActive?'Snap measure: click P1...':'';if(!measureActive){measureP1=null;if(window._gSnap)window._gSnap.innerHTML='';}};
 document.getElementById('btnClear').onclick=()=>{if(window._gMeasure)window._gMeasure.innerHTML='';if(window._gSnap)window._gSnap.innerHTML='';measureP1=null;document.getElementById('mStatus').textContent='';};
@@ -1215,6 +1288,11 @@ function hideLanding(){const l=document.getElementById('landing');if(l)l.classLi
     TEST_SUBS.forEach((s,i)=>{const o=document.createElement('option');o.value=i;o.textContent=s.label;sel.appendChild(o);});
     sel.onchange=()=>{const i=+sel.value;if(TEST_SUBS[i])loadV1(TEST_SUBS[i].code);sel.selectedIndex=0;}; } }
 loadV1FromHash();   // a code in the URL renders + hides the landing; otherwise the landing stays up
+
+// ─── PWA: offline app-shell via service worker (HTTPS / localhost only) ──────
+if('serviceWorker' in navigator){
+  window.addEventListener('load',()=>{navigator.serviceWorker.register('sw.js').catch(()=>{});});
+}
 </script>
 </body>
 </html>
